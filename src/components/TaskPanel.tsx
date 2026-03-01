@@ -13,6 +13,7 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
 import { PRIORITY_COLORS, LABEL_COLORS, STATUS_COLORS } from "../utils/colors"
 import { DUMMY_USERS } from "../utils/users"
+import DropdownInput from "./DropdownInput"
 import type { Priority, Status, TaskNodeData, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
@@ -29,6 +30,18 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
   const data = selectedNode?.data as TaskNodeData | undefined
+
+  // Collect all unique labels across all task nodes for dropdown suggestions
+  const allLabels = useMemo(() => {
+    const map = new Map<string, LabelItem>()
+    for (const n of nodes) {
+      if (n.type !== "task") continue
+      for (const l of (n.data as TaskNodeData).labels ?? []) {
+        if (!map.has(l.text)) map.set(l.text, l)
+      }
+    }
+    return Array.from(map.values())
+  }, [nodes])
 
   const update = (patch: Partial<TaskNodeData>) => {
     if (selectedNode) updateNode(selectedNode.id, patch)
@@ -168,9 +181,12 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
             <SectionHeader>Metadata</SectionHeader>
 
             <Field label="Assignee">
-              <AssigneeInput
+              <DropdownInput
                 value={data.assignee as string}
                 onChange={(v) => update({ assignee: v })}
+                suggestions={DUMMY_USERS}
+                placeholder="Who owns this?"
+                className={inputClass}
               />
             </Field>
 
@@ -178,6 +194,7 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
               <LabelEditor
                 labels={data.labels as LabelItem[]}
                 onChange={(labels) => update({ labels })}
+                allLabels={allLabels}
               />
             </Field>
 
@@ -280,35 +297,46 @@ function EditableTitle({
 function LabelEditor({
   labels,
   onChange,
+  allLabels,
 }: {
   labels: LabelItem[]
   onChange: (labels: LabelItem[]) => void
+  allLabels: LabelItem[]
 }) {
   const [input, setInput] = useState("")
   const [color, setColor] = useState<string>(LABEL_COLORS[0])
 
-  const addLabel = () => {
-    const trimmed = input.trim()
-    if (trimmed && !labels.some((l) => l.text === trimmed)) {
-      onChange([...labels, { text: trimmed, color }])
-    }
+  const addLabel = (text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed || labels.some((l) => l.text === trimmed)) return
+    // Reuse color from existing label if it exists
+    const existing = allLabels.find((l) => l.text === trimmed)
+    onChange([...labels, { text: trimmed, color: existing?.color ?? color }])
     setInput("")
   }
+
+  // Suggestions: all known labels not already added, filtered by input
+  const suggestions = useMemo(() => {
+    const added = new Set(labels.map((l) => l.text))
+    let available = allLabels.filter((l) => !added.has(l.text)).map((l) => l.text)
+    if (input) {
+      const q = input.toLowerCase()
+      available = available.filter((t) => t.toLowerCase().includes(q))
+    }
+    return available
+  }, [input, labels, allLabels])
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
-        <input
-          className={`${inputClass} flex-1`}
+        <DropdownInput
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault()
-              addLabel()
-            }
-          }}
-          placeholder="Type and press Enter"
+          onChange={setInput}
+          onSelect={(v) => addLabel(v)}
+          onCommit={(v) => addLabel(v)}
+          suggestions={suggestions}
+          placeholder="Search or create label…"
+          className={`${inputClass} flex-1`}
         />
         <div className="flex items-center gap-1">
           {LABEL_COLORS.map((c) => (
@@ -341,43 +369,6 @@ function LabelEditor({
                 ×
               </button>
             </span>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AssigneeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [focused, setFocused] = useState(false)
-  const suggestions = useMemo(() => {
-    if (!value) return DUMMY_USERS
-    const q = value.toLowerCase()
-    return DUMMY_USERS.filter((u) => u.toLowerCase().includes(q))
-  }, [value])
-
-  return (
-    <div className="relative">
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 150)}
-        placeholder="Who owns this?"
-        className={inputClass}
-      />
-      {focused && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)] rounded-md shadow-lg max-h-36 overflow-y-auto">
-          {suggestions.map((u) => (
-            <button
-              key={u}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onChange(u); setFocused(false) }}
-              className="w-full text-left px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)] transition-colors"
-            >
-              {u}
-            </button>
           ))}
         </div>
       )}

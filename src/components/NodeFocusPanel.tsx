@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
 import { PRIORITY_COLORS, LABEL_COLORS, STATUS_COLORS } from "../utils/colors"
 import { DUMMY_USERS } from "../utils/users"
+import DropdownInput from "./DropdownInput"
 import type { TaskNodeData, Priority, Status, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
@@ -29,6 +30,18 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 	const existingData = mode === "edit" && nodeId
 		? (nodes.find((n) => n.id === nodeId)?.data as TaskNodeData | undefined)
 		: undefined
+
+	// Collect all unique labels across all task nodes for dropdown suggestions
+	const allLabels = useMemo(() => {
+		const map = new Map<string, LabelItem>()
+		for (const n of nodes) {
+			if (n.type !== "task") continue
+			for (const l of (n.data as TaskNodeData).labels ?? []) {
+				if (!map.has(l.text)) map.set(l.text, l)
+			}
+		}
+		return Array.from(map.values())
+	}, [nodes])
 
   const [title, setTitle] = useState(existingData?.title ?? "")
   const [description, setDescription] = useState(existingData?.description ?? "")
@@ -71,14 +84,6 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 		window.addEventListener("keydown", onKey)
 		return () => window.removeEventListener("keydown", onKey)
 	})
-
-	const addLabel = () => {
-		const t = labelInput.trim()
-		if (t && !labels.some((l) => l.text === t)) {
-			setLabels([...labels, { text: t, color: labelColor }])
-		}
-		setLabelInput("")
-	}
 
 	return (
 		<>
@@ -195,7 +200,13 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 
 						<div className="grid grid-cols-2 gap-3">
 							<Field label="Assignee">
-								<AssigneeInput value={assignee} onChange={setAssignee} />
+								<DropdownInput
+									value={assignee}
+									onChange={setAssignee}
+									suggestions={DUMMY_USERS}
+									placeholder="Who owns this?"
+									className={inputClass}
+								/>
 							</Field>
 							<Field label="Due Date">
 								<input
@@ -210,16 +221,26 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 						{/* Labels */}
 						<Field label="Labels">
 							<div className="flex gap-2">
-								<input
+								<DropdownInput
 									value={labelInput}
-									onChange={(e) => setLabelInput(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault()
-											addLabel()
+									onChange={setLabelInput}
+									onSelect={(v) => {
+										const t = v.trim()
+										if (t && !labels.some((l) => l.text === t)) {
+											const existing = allLabels.find((l) => l.text === t)
+											setLabels([...labels, { text: t, color: existing?.color ?? labelColor }])
 										}
+										setLabelInput("")
 									}}
-									placeholder="Type and press Enter…"
+									onCommit={(v) => {
+										if (!labels.some((l) => l.text === v)) {
+											const existing = allLabels.find((l) => l.text === v)
+											setLabels([...labels, { text: v, color: existing?.color ?? labelColor }])
+										}
+										setLabelInput("")
+									}}
+									suggestions={allLabels.filter((l) => !labels.some((x) => x.text === l.text)).map((l) => l.text)}
+									placeholder="Search or create label…"
 									className={`${inputClass} flex-1`}
 								/>
 								{/* Color picker dots */}
@@ -330,43 +351,6 @@ function ChipButton({
 		>
 			{children}
 		</button>
-	)
-}
-
-function AssigneeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-	const [focused, setFocused] = useState(false)
-	const suggestions = useMemo(() => {
-		if (!value) return DUMMY_USERS
-		const q = value.toLowerCase()
-		return DUMMY_USERS.filter((u) => u.toLowerCase().includes(q))
-	}, [value])
-
-	return (
-		<div className="relative">
-			<input
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
-				onFocus={() => setFocused(true)}
-				onBlur={() => setTimeout(() => setFocused(false), 150)}
-				placeholder="Who owns this?"
-				className={inputClass}
-			/>
-			{focused && suggestions.length > 0 && (
-				<div className="absolute z-50 left-0 right-0 top-full mt-1 bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)] rounded-md shadow-lg max-h-36 overflow-y-auto">
-					{suggestions.map((u) => (
-						<button
-							key={u}
-							type="button"
-							onMouseDown={(e) => e.preventDefault()}
-							onClick={() => { onChange(u); setFocused(false) }}
-							className="w-full text-left px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)] transition-colors"
-						>
-							{u}
-						</button>
-					))}
-				</div>
-			)}
-		</div>
 	)
 }
 

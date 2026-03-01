@@ -34,7 +34,7 @@ import "@xyflow/react/dist/style.css"
 
 import TaskNode from "./TaskNode"
 import GroupNode from "./GroupNode"
-import TypedEdge, { EdgeArrowDefs } from "./TypedEdge"
+import TypedEdge from "./TypedEdge"
 import NodeFocusPanel from "./NodeFocusPanel"
 import { usePMGraphStore, getActivePreset, getFilteredNodeIds } from "../store/usePMGraphStore"
 import { getCategoryColor } from "../utils/colors"
@@ -436,7 +436,6 @@ export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: G
 
   return (
     <div className="w-full h-full relative" onDoubleClick={handleCanvasDoubleClick}>
-      <EdgeArrowDefs />
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}

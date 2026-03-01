@@ -55,6 +55,14 @@ body,
   color: var(--color-text-primary);
 }
 
+/* Force Inter everywhere — overrides React Flow internals, buttons, inputs, etc. */
+*, *::before, *::after {
+  font-family: inherit;
+}
+input, button, select, textarea, kbd {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
 /* ── React Flow overrides ────────────────────────────────────────── */
 .react-flow__renderer {
   background: transparent;
@@ -62,6 +70,14 @@ body,
 
 .react-flow__edge-path {
   cursor: pointer;
+}
+/* Edges render above node bodies */
+.react-flow__edgelabel-renderer,
+.react-flow__edges {
+  z-index: 2 !important;
+}
+.react-flow__nodes {
+  z-index: 1 !important;
 }
 
 .react-flow__selection {
@@ -78,10 +94,11 @@ body,
 }
 .react-flow__node {
   cursor: pointer;
+  overflow: visible;
 }
 .react-flow__handle {
   cursor: crosshair;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast), border var(--transition-fast);
 }
 .react-flow__handle:hover {
   background: rgba(255, 255, 255, 0.6) !important;
@@ -101,6 +118,35 @@ body,
 /* MiniMap */
 .react-flow__minimap-node {
   stroke-width: 0;
+}
+
+/* ── Task handle states ─────────────────────────────────────────── */
+/* Override React Flow's default absolute positioning for inline handles */
+.task-handle {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+}
+.task-handle.handle-ring {
+  background-color: transparent !important;
+  border: 2px solid rgba(255,255,255,0.25) !important;
+}
+.task-handle.handle-filled {
+  background-color: rgba(255,255,255,0.35) !important;
+  border: none !important;
+}
+.task-handle.handle-green {
+  background-color: #22c55e !important;
+  border: none !important;
+}
+/* Fill ring handles when a connection drag is in progress */
+.task-handle.handle-ring.connecting,
+.task-handle.handle-ring.connectingfrom,
+.task-handle.handle-ring.connectingto {
+  background-color: rgba(255,255,255,0.35) !important;
+  border: none !important;
 }
 
 /* ── Blocker edge pulse ──────────────────────────────────────────── */
