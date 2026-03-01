@@ -6,6 +6,7 @@
  */
 import { useState, useRef, useEffect, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
+import { PRESETS } from "../utils/presets"
 import type { TaskNodeData, LabelItem } from "../types"
 
 export default function FilterBar() {
@@ -14,6 +15,8 @@ export default function FilterBar() {
 	const nodes = usePMGraphStore((s) => s.nodes)
 	const activeView = usePMGraphStore((s) => s.activeView)
 	const setActiveView = usePMGraphStore((s) => s.setActiveView)
+	const activePresetId = usePMGraphStore((s) => s.activePresetId)
+	const setPreset = usePMGraphStore((s) => s.setPreset)
 	const preset = usePMGraphStore((s) => getActivePreset(s))
 
 	// Collect all unique labels across task nodes
@@ -109,6 +112,12 @@ export default function FilterBar() {
 						setFilters({ departments: next })
 					}}
 					onClear={() => setFilters({ departments: [] })}
+				/>
+
+				{/* Preset selector */}
+				<PresetSelector
+					activePresetId={activePresetId}
+					onSelect={setPreset}
 				/>
 
 				{/* View toggle */}
@@ -313,6 +322,66 @@ function LabelDropdown({
 							</button>
 						</>
 					)}
+				</div>
+			)}
+		</div>
+	)
+}
+
+// ── Preset selector ──────────────────────────────────────────────────────────
+
+function PresetSelector({
+	activePresetId,
+	onSelect,
+}: {
+	activePresetId: string
+	onSelect: (id: string) => void
+}) {
+	const [open, setOpen] = useState(false)
+	const ref = useRef<HTMLDivElement>(null)
+	const activePreset = PRESETS.find((p) => p.id === activePresetId) ?? PRESETS[0]
+
+	useEffect(() => {
+		if (!open) return
+		const handler = (e: MouseEvent) => {
+			if (ref.current && !ref.current.contains(e.target as HTMLElement)) {
+				setOpen(false)
+			}
+		}
+		document.addEventListener("mousedown", handler)
+		return () => document.removeEventListener("mousedown", handler)
+	}, [open])
+
+	return (
+		<div className="relative" ref={ref}>
+			<button
+				onClick={() => setOpen(!open)}
+				className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors duration-150"
+			>
+				{activePreset.label}
+				<svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+				</svg>
+			</button>
+
+			{open && (
+				<div className="absolute right-0 top-full mt-1 w-44 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] rounded-lg shadow-xl z-50 py-1">
+					{PRESETS.map((p) => (
+						<button
+							key={p.id}
+							onClick={() => { onSelect(p.id); setOpen(false) }}
+							className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-[var(--color-surface-overlay)] transition-colors"
+						>
+							<span className={p.id === activePresetId ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)]"}>
+								{p.label}
+							</span>
+							{p.id === activePresetId && (
+								<svg className="w-3 h-3 ml-auto text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+									<path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+								</svg>
+							)}
+						</button>
+					))}
 				</div>
 			)}
 		</div>

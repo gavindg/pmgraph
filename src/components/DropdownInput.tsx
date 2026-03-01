@@ -34,6 +34,7 @@ export default function DropdownInput({
   const [open, setOpen] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState(-1)
   const [isEditing, setIsEditing] = useState(false)
+  const [confirmed, setConfirmed] = useState(!!value)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -54,6 +55,8 @@ export default function DropdownInput({
       setOpen(false)
       setHighlightIdx(-1)
       setIsEditing(false)
+      setConfirmed(true)
+      inputRef.current?.blur()
     },
     [onChange, onSelect]
   )
@@ -80,10 +83,17 @@ export default function DropdownInput({
         select(filtered[0])
         return
       }
-      // Enter with no dropdown → commit raw value
-      if (e.key === "Enter" && onCommit && value.trim()) {
+      // Enter with no dropdown → select first match (like Tab) or confirm
+      if (e.key === "Enter") {
         e.preventDefault()
-        onCommit(value.trim())
+        if (isEditing && value && filtered.length > 0) {
+          select(filtered[0])
+        } else if (onCommit && value.trim()) {
+          onCommit(value.trim())
+        } else {
+          setConfirmed(true)
+          inputRef.current?.blur()
+        }
         return
       }
       return
@@ -102,6 +112,8 @@ export default function DropdownInput({
         e.preventDefault()
         if (highlightIdx >= 0 && highlightIdx < filtered.length) {
           select(filtered[highlightIdx])
+        } else if (filtered.length > 0) {
+          select(filtered[0])
         } else if (onCommit && value.trim()) {
           onCommit(value.trim())
         }
@@ -121,11 +133,17 @@ export default function DropdownInput({
         e.preventDefault()
         setOpen(false)
         setHighlightIdx(-1)
+        setConfirmed(true)
+        inputRef.current?.blur()
         break
     }
   }
 
   const selectedColor = value && colors?.[value] ? colors[value] : null
+
+  const confirmedClass = confirmed && value
+    ? "bg-transparent border-transparent hover:bg-[var(--color-surface-overlay)] hover:border-[var(--color-border-default)] cursor-text"
+    : ""
 
   return (
     <div className="relative">
@@ -142,18 +160,20 @@ export default function DropdownInput({
           onChange={(e) => {
             onChange(e.target.value)
             setIsEditing(true)
+            setConfirmed(false)
             setOpen(true)
             setHighlightIdx(-1)
           }}
           onFocus={() => {
+            setConfirmed(false)
             setIsEditing(false)
             setOpen(true)
             setHighlightIdx(-1)
           }}
-          onBlur={() => setTimeout(() => { setOpen(false); setHighlightIdx(-1); setIsEditing(false) }, 150)}
+          onBlur={() => setTimeout(() => { setOpen(false); setHighlightIdx(-1); setIsEditing(false); if (value) setConfirmed(true) }, 150)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={className}
+          className={`${className} ${confirmedClass} transition-colors duration-150`}
           style={selectedColor ? { paddingLeft: "1.75rem" } : undefined}
         />
       </div>

@@ -53,6 +53,7 @@ function tryParseDate(input: string): string | null {
 export default function DatePicker({ value, onChange, className }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [inputText, setInputText] = useState(value ? formatDisplay(value) : "")
+  const [confirmed, setConfirmed] = useState(!!value)
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -142,7 +143,12 @@ export default function DatePicker({ value, onChange, className }: DatePickerPro
   const selectDate = (cell: typeof cells[0]) => {
     onChange(toISODate(cell.year, cell.month, cell.day))
     setOpen(false)
+    setConfirmed(true)
   }
+
+  const confirmedClass = confirmed && value
+    ? "bg-transparent !border-transparent hover:bg-[var(--color-surface-overlay)] hover:!border-[var(--color-border-default)] cursor-text"
+    : ""
 
   return (
     <div className="relative" ref={ref}>
@@ -154,14 +160,19 @@ export default function DatePicker({ value, onChange, className }: DatePickerPro
         onClick={() => setOpen(true)}
         onChange={(e) => {
           setInputText(e.target.value)
+          setConfirmed(false)
           const parsed = tryParseDate(e.target.value)
           if (parsed) {
             onChange(parsed)
           }
         }}
+        onFocus={() => {
+          setConfirmed(false)
+          setOpen(true)
+        }}
         onBlur={() => {
-          // Reset display text to match current value
           setInputText(value ? formatDisplay(value) : "")
+          if (value) setConfirmed(true)
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -170,15 +181,17 @@ export default function DatePicker({ value, onChange, className }: DatePickerPro
               onChange(parsed)
               setOpen(false)
             }
+            setConfirmed(true)
             inputRef.current?.blur()
           }
           if (e.key === "Escape") {
             setInputText(value ? formatDisplay(value) : "")
             setOpen(false)
+            if (value) setConfirmed(true)
             inputRef.current?.blur()
           }
         }}
-        className={className || "w-full text-left bg-transparent outline-none text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"}
+        className={`${className || "w-full text-left bg-transparent outline-none text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"} ${confirmedClass} transition-colors duration-150`}
       />
 
       {open && (
