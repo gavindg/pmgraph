@@ -71,6 +71,18 @@ export default function DropdownInput({
   }, [highlightIdx])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Tab cycles through options when dropdown is open
+    if (e.key === "Tab" && filtered.length > 0) {
+      e.preventDefault()
+      if (!open) {
+        setOpen(true)
+        setHighlightIdx(0)
+      } else {
+        setHighlightIdx((i) => (i + 1) % filtered.length)
+      }
+      return
+    }
+
     if (!open || filtered.length === 0) {
       if (e.key === "ArrowDown" && filtered.length > 0) {
         setOpen(true)
@@ -78,17 +90,10 @@ export default function DropdownInput({
         e.preventDefault()
         return
       }
-      // Tab with no dropdown → select first match only if user was typing
-      if (e.key === "Tab" && isEditing && value && filtered.length > 0) {
-        select(filtered[0])
-        return
-      }
-      // Enter with no dropdown → select first match (like Tab) or confirm
+      // Enter confirms current value
       if (e.key === "Enter") {
         e.preventDefault()
-        if (isEditing && value && filtered.length > 0) {
-          select(filtered[0])
-        } else if (onCommit && value.trim()) {
+        if (onCommit && value.trim()) {
           onCommit(value.trim())
         } else {
           setConfirmed(true)
@@ -117,17 +122,6 @@ export default function DropdownInput({
         } else if (onCommit && value.trim()) {
           onCommit(value.trim())
         }
-        break
-      case "Tab":
-        if (highlightIdx >= 0 && highlightIdx < filtered.length) {
-          select(filtered[highlightIdx])
-        } else if (isEditing && filtered.length > 0 && value) {
-          // Tab with typed text but no highlight → select first match
-          select(filtered[0])
-        }
-        // Don't preventDefault — let browser move focus to next field
-        setOpen(false)
-        setHighlightIdx(-1)
         break
       case "Escape":
         e.preventDefault()

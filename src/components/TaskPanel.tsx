@@ -17,6 +17,7 @@ import { getPresetById } from "../utils/presets"
 import { LABEL_COLORS, PRIORITY_COLORS } from "../utils/colors"
 import DropdownInput from "./DropdownInput"
 import DatePicker from "./DatePicker"
+import { DUMMY_USERS } from "../utils/users"
 import type { Priority, TaskNodeData, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
@@ -201,11 +202,13 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
             <SectionHeader>Metadata</SectionHeader>
 
             <Field label="Assignee">
-              <input
-                className={inputClass}
+              <DropdownInput
                 value={data.assignee as string}
-                onChange={(e) => update({ assignee: e.target.value })}
+                onChange={(v) => update({ assignee: v })}
+                onSelect={(v) => update({ assignee: v })}
+                suggestions={DUMMY_USERS}
                 placeholder="Who owns this?"
+                className={inputClass}
               />
             </Field>
 
