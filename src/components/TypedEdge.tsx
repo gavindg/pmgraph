@@ -1,9 +1,10 @@
 /**
- * TypedEdge — Custom edge with visual styling based on edge type.
+ * TypedEdge — Custom directed edge with type-based styling.
  *
  * Types: blocks (red solid), relates (gray dashed), triggers (blue dash-dot).
- * Synthetic edges (from collapsed groups) render thicker with a count label.
- * Blocking edges get a CSS pulse animation.
+ * Synthetic edges (collapsed group aggregations) are thicker with a count label.
+ * Arrow markers are defined globally in GraphCanvas via <EdgeArrowDefs>.
+ * Click to cycle edge type, double-click to delete.
  */
 import {
   BaseEdge,
@@ -12,8 +13,33 @@ import {
   type EdgeProps,
   type Edge,
 } from "@xyflow/react"
-import type { PMEdgeData } from "../types"
+import type { PMEdgeData, EdgeType } from "../types"
 import { EDGE_TYPE_STYLES } from "../utils/colors"
+
+/** Render this once in GraphCanvas to define all arrow markers globally. */
+export function EdgeArrowDefs() {
+  const types: EdgeType[] = ["blocks", "relates", "triggers"]
+  return (
+    <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+      <defs>
+        {types.map((t) => (
+          <marker
+            key={t}
+            id={`pm-arrow-${t}`}
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={EDGE_TYPE_STYLES[t].stroke} />
+          </marker>
+        ))}
+      </defs>
+    </svg>
+  )
+}
 
 export default function TypedEdge({
   id,
@@ -24,8 +50,6 @@ export default function TypedEdge({
   sourcePosition,
   targetPosition,
   data,
-  style,
-  markerEnd,
 }: EdgeProps<Edge<PMEdgeData>>) {
   const edgeType = data?.edgeType ?? "blocks"
   const isSynthetic = data?.synthetic ?? false
@@ -42,13 +66,12 @@ export default function TypedEdge({
   })
 
   return (
-    <g className={edgeType === "blocks" ? "edge-blocker" : undefined}>
+    <g>
       <BaseEdge
         id={id}
         path={edgePath}
-        markerEnd={markerEnd}
+        markerEnd={`url(#pm-arrow-${edgeType})`}
         style={{
-          ...style,
           stroke: typeStyle.stroke,
           strokeWidth: isSynthetic ? 4 : 2,
           strokeDasharray: isSynthetic ? "8 4" : typeStyle.dash,

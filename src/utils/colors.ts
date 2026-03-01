@@ -37,6 +37,20 @@ export const EDGE_TYPE_STYLES = {
   triggers: { stroke: "#3b82f6", dash: "8 4 2 4", markerColor: "#3b82f6", label: "Triggers" },
 } as const
 
+// ── Label colors ────────────────────────────────────────────────────
+
+export const LABEL_COLORS = [
+  "#6b7280", // gray
+  "#3b82f6", // blue
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#ef4444", // red
+  "#f97316", // orange
+  "#eab308", // yellow
+  "#22c55e", // green
+  "#14b8a6", // teal
+] as const
+
 export const PRIORITY_COLORS = {
   low: { dot: "#4ade80", bg: "#166534", text: "text-green-400" },
   medium: { dot: "#facc15", bg: "#854d0e", text: "text-yellow-400" },

@@ -1,9 +1,7 @@
 /**
  * usePMGraphStore — Zustand store (single source of truth)
  *
- * Manages nodes, edges, selection, filters, presets, and group state.
- * React Flow's change handlers are wired directly so built-in
- * interactions (drag, select, delete key) stay in sync.
+ * Manages nodes, edges, selection, filters, presets, group state, and undo/redo history.
  */
 import { create } from "zustand"
 import {
@@ -26,7 +24,17 @@ import type {
   PMEdgeData,
 } from "../types"
 
+const MAX_HISTORY = 50
 const EDGE_TYPE_CYCLE: EdgeType[] = ["blocks", "relates", "triggers"]
+
+interface HistorySlice {
+  nodes: Node[]
+  edges: Edge[]
+}
+
+function pushHistory(past: HistorySlice[], current: HistorySlice): HistorySlice[] {
+  return [...past.slice(-(MAX_HISTORY - 1)), current]
+}
 
 interface PMGraphState {
   // ── Data ──────────────────────────────────────────────────────────
@@ -36,6 +44,13 @@ interface PMGraphState {
   filters: Filters
   activePresetId: string
   collapsedGroups: Set<string>
+
+  // ── UI state ──────────────────────────────────────────────────────
+  taskPanelOpen: boolean
+
+  // ── Undo/redo ─────────────────────────────────────────────────────
+  _past: HistorySlice[]
+  _future: HistorySlice[]
 
   // ── Node actions ──────────────────────────────────────────────────
   addNode: (position: { x: number; y: number }, data?: Partial<TaskNodeData>) => string
@@ -61,6 +76,13 @@ interface PMGraphState {
   // ── Preset actions ────────────────────────────────────────────────
   setPreset: (presetId: string) => void
 
+  // ── UI actions ────────────────────────────────────────────────────
+  setTaskPanelOpen: (open: boolean) => void
+
+  // ── History actions ───────────────────────────────────────────────
+  undo: () => void
+  redo: () => void
+
   // ── React Flow change handlers ────────────────────────────────────
   onNodesChange: (changes: NodeChange[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
@@ -80,17 +102,26 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
   filters: defaultFilters,
   activePresetId: "gamedev",
   collapsedGroups: new Set<string>(),
+  taskPanelOpen: false,
+  _past: [],
+  _future: [],
 
   // ── Node actions ──────────────────────────────────────────────────
 
   addNode: (position, data) => {
     const node = createDefaultNode(position, data)
-    set((s) => ({ nodes: [...s.nodes, node] }))
+    set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
+      nodes: [...s.nodes, node],
+    }))
     return node.id
   },
 
   updateNode: (id, data) => {
     set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
       nodes: s.nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, ...data } } : n
       ),
@@ -99,9 +130,12 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
 
   deleteNode: (id) => {
     set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
       nodes: s.nodes.filter((n) => n.id !== id),
       edges: s.edges.filter((e) => e.source !== id && e.target !== id),
       selectedNodeId: s.selectedNodeId === id ? null : s.selectedNodeId,
+      taskPanelOpen: s.selectedNodeId === id ? false : s.taskPanelOpen,
     }))
   },
 
@@ -113,7 +147,11 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
 
   addGroupNode: (position, title, color) => {
     const node = createGroupNode(position, title, color)
-    set((s) => ({ nodes: [...s.nodes, node] }))
+    set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
+      nodes: [...s.nodes, node],
+    }))
     return node.id
   },
 
@@ -121,26 +159,21 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
     set((s) => {
       const collapsed = new Set(s.collapsedGroups)
       const isCollapsed = collapsed.has(groupId)
-
-      if (isCollapsed) {
-        collapsed.delete(groupId)
-      } else {
-        collapsed.add(groupId)
-      }
-
+      if (isCollapsed) collapsed.delete(groupId)
+      else collapsed.add(groupId)
       const nodes = s.nodes.map((n) => {
-        // Toggle group's own collapsed data
         if (n.id === groupId && n.type === "group") {
           return { ...n, data: { ...n.data, collapsed: !isCollapsed } }
         }
-        // Toggle visibility of children
-        if (n.parentId === groupId) {
-          return { ...n, hidden: !isCollapsed }
-        }
+        if (n.parentId === groupId) return { ...n, hidden: !isCollapsed }
         return n
       })
-
-      return { nodes, collapsedGroups: collapsed }
+      return {
+        _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+        _future: [],
+        nodes,
+        collapsedGroups: collapsed,
+      }
     })
   },
 
@@ -148,14 +181,14 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
     set((s) => {
       const node = s.nodes.find((n) => n.id === nodeId)
       if (!node || node.type === "group") return s
-
       if (groupId) {
         const group = s.nodes.find((n) => n.id === groupId)
         if (!group) return s
-        // Convert position to relative to group
         const relX = node.position.x - group.position.x
         const relY = node.position.y - group.position.y
         return {
+          _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+          _future: [],
           nodes: s.nodes.map((n) =>
             n.id === nodeId
               ? { ...n, parentId: groupId, position: { x: Math.max(10, relX), y: Math.max(40, relY) } }
@@ -163,11 +196,12 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
           ),
         }
       } else {
-        // Remove from group — convert back to absolute position
         const parent = s.nodes.find((n) => n.id === node.parentId)
         const absX = node.position.x + (parent?.position.x ?? 0)
         const absY = node.position.y + (parent?.position.y ?? 0)
         return {
+          _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+          _future: [],
           nodes: s.nodes.map((n) =>
             n.id === nodeId
               ? { ...n, parentId: undefined, position: { x: absX, y: absY } }
@@ -191,7 +225,6 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
           e.targetHandle === connection.targetHandle
       )
       if (duplicate) return s
-
       const newEdge: Edge = {
         id: crypto.randomUUID(),
         type: "typed",
@@ -201,16 +234,26 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
         targetHandle: connection.targetHandle ?? null,
         data: { edgeType: "blocks" } as PMEdgeData,
       }
-      return { edges: [...s.edges, newEdge] }
+      return {
+        _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+        _future: [],
+        edges: [...s.edges, newEdge],
+      }
     })
   },
 
   removeEdge: (id) => {
-    set((s) => ({ edges: s.edges.filter((e) => e.id !== id) }))
+    set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
+      edges: s.edges.filter((e) => e.id !== id),
+    }))
   },
 
   cycleEdgeType: (edgeId) => {
     set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
       edges: s.edges.map((e) => {
         if (e.id !== edgeId) return e
         const current = (e.data as PMEdgeData)?.edgeType ?? "blocks"
@@ -223,13 +266,15 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
 
   setEdgeType: (edgeId, edgeType) => {
     set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
       edges: s.edges.map((e) =>
         e.id === edgeId ? { ...e, data: { ...e.data, edgeType } } : e
       ),
     }))
   },
 
-  // ── Filter actions ────────────────────────────────────────────────
+  // ── Filter actions (no history snapshot) ─────────────────────────
 
   setFilters: (partial) => {
     set((s) => ({ filters: { ...s.filters, ...partial } }))
@@ -244,7 +289,6 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
   setPreset: (presetId) => {
     const preset = getPresetById(presetId)
     const categoryNames = new Set(preset.categories.map((c) => c.name))
-
     set((s) => ({
       activePresetId: presetId,
       filters: { ...s.filters, departments: [] },
@@ -257,12 +301,57 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
     }))
   },
 
+  // ── UI actions ────────────────────────────────────────────────────
+
+  setTaskPanelOpen: (open) => {
+    set({ taskPanelOpen: open })
+  },
+
+  // ── History actions ───────────────────────────────────────────────
+
+  undo: () => {
+    set((s) => {
+      if (s._past.length === 0) return s
+      const prev = s._past[s._past.length - 1]
+      return {
+        _past: s._past.slice(0, -1),
+        _future: [{ nodes: s.nodes, edges: s.edges }, ...s._future.slice(0, MAX_HISTORY - 1)],
+        nodes: prev.nodes,
+        edges: prev.edges,
+      }
+    })
+  },
+
+  redo: () => {
+    set((s) => {
+      if (s._future.length === 0) return s
+      const next = s._future[0]
+      return {
+        _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+        _future: s._future.slice(1),
+        nodes: next.nodes,
+        edges: next.edges,
+      }
+    })
+  },
+
   // ── React Flow change handlers ────────────────────────────────────
 
   onNodesChange: (changes) => {
-    set((s) => ({
-      nodes: applyNodeChanges(changes, s.nodes),
-    }))
+    const hasDragEnd = changes.some(
+      (c) => c.type === "position" && c.dragging === false
+    )
+    set((s) => {
+      const newNodes = applyNodeChanges(changes, s.nodes)
+      if (hasDragEnd) {
+        return {
+          _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+          _future: [],
+          nodes: newNodes,
+        }
+      }
+      return { nodes: newNodes }
+    })
   },
 
   onEdgesChange: (changes) => {
@@ -272,26 +361,16 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
 
 // ── Selectors ─────────────────────────────────────────────────────────────────
 
-/** Returns the active Preset object. */
 export function getActivePreset(state: PMGraphState): Preset {
   return getPresetById(state.activePresetId)
 }
 
-/**
- * Returns the set of node IDs that pass the current filters.
- * A node passes when ALL active filters match.
- */
-export function getFilteredNodeIds(
-  nodes: Node[],
-  filters: Filters
-): Set<string> {
+export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string> {
   const { departments, priority, assignee, search } = filters
   const noFilters =
     departments.length === 0 && priority === "" && assignee === "" && search === ""
 
-  if (noFilters) {
-    return new Set(nodes.map((n) => n.id))
-  }
+  if (noFilters) return new Set(nodes.map((n) => n.id))
 
   const searchLower = search.toLowerCase()
   const visible = new Set<string>()

@@ -18,18 +18,18 @@ import TaskPanel from "./components/TaskPanel"
 import { usePMGraphStore } from "./store/usePMGraphStore"
 
 export default function App() {
-  const selectedNodeId = usePMGraphStore((s) => s.selectedNodeId)
+  const taskPanelOpen = usePMGraphStore((s) => s.taskPanelOpen)
 
   return (
-    <div className="flex flex-col h-screen bg-surface-base] text-[var(--color-text-primary)]">
+    <div className="flex flex-col h-screen bg-[var(--color-surface-base)] text-[var(--color-text-primary)]">
       <FilterBar />
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <ReactFlowProvider>
           <div className="flex-1 min-w-0">
             <GraphCanvas />
           </div>
         </ReactFlowProvider>
-        {selectedNodeId !== null && <TaskPanel />}
+        <TaskPanel isOpen={taskPanelOpen} />
       </div>
     </div>
   )

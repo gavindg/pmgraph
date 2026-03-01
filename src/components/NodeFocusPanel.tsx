@@ -1,51 +1,47 @@
 /**
- * NodeCreationPanel — Full-screen modal for creating a new task node.
+ * NodeFocusPanel — Full-screen modal for creating or editing a task node.
  *
- * Inspired by Linear's "New Issue" panel. Center-screen overlay with
- * all task fields. Dimmed backdrop, Escape to cancel, Ctrl+Enter to submit.
+ * Create mode: all fields empty, submit calls addNode.
+ * Edit mode (F key): pre-fills from existing node, submit calls updateNode.
+ *
+ * Keyboard: Escape = close, Ctrl+Enter = submit.
  */
 import { useState, useEffect, useRef } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS } from "../utils/colors"
-import type { TaskNodeData, Priority } from "../types"
+import { PRIORITY_COLORS, LABEL_COLORS } from "../utils/colors"
+import type { TaskNodeData, Priority, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
 
-interface NodeCreationPanelProps {
+interface NodeFocusPanelProps {
+  mode: "create" | "edit"
+  nodeId?: string
   onSubmit: (data: Partial<TaskNodeData>) => void
-  onCancel: () => void
+  onClose: () => void
 }
 
-export default function NodeCreationPanel({
-  onSubmit,
-  onCancel,
-}: NodeCreationPanelProps) {
+export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: NodeFocusPanelProps) {
   const preset = usePMGraphStore((s) => getActivePreset(s))
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [department, setDepartment] = useState("")
-  const [assignee, setAssignee] = useState("")
-  const [priority, setPriority] = useState<Priority>("medium")
-  const [labels, setLabels] = useState<string[]>([])
+  const nodes = usePMGraphStore((s) => s.nodes)
+  const existingData = mode === "edit" && nodeId
+    ? (nodes.find((n) => n.id === nodeId)?.data as TaskNodeData | undefined)
+    : undefined
+
+  const [title, setTitle] = useState(existingData?.title ?? "")
+  const [description, setDescription] = useState(existingData?.description ?? "")
+  const [department, setDepartment] = useState(existingData?.department ?? "")
+  const [assignee, setAssignee] = useState(existingData?.assignee ?? "")
+  const [priority, setPriority] = useState<Priority>(existingData?.priority ?? "medium")
+  const [labels, setLabels] = useState<LabelItem[]>(existingData?.labels ?? [])
   const [labelInput, setLabelInput] = useState("")
-  const [dueDate, setDueDate] = useState("")
+  const [labelColor, setLabelColor] = useState<string>(LABEL_COLORS[0])
+  const [dueDate, setDueDate] = useState((existingData?.dueDate as string) ?? "")
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     titleRef.current?.focus()
-  }, [])
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel()
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault()
-        handleSubmit()
-      }
-    }
-    window.addEventListener("keydown", handleKey)
-    return () => window.removeEventListener("keydown", handleKey)
-  })
+    if (mode === "edit") titleRef.current?.select()
+  }, [mode])
 
   const handleSubmit = () => {
     onSubmit({
@@ -59,10 +55,22 @@ export default function NodeCreationPanel({
     })
   }
 
+  // Ctrl+Enter → submit (Escape handled in GraphCanvas)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault()
+        handleSubmit()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  })
+
   const addLabel = () => {
-    const trimmed = labelInput.trim()
-    if (trimmed && !labels.includes(trimmed)) {
-      setLabels([...labels, trimmed])
+    const t = labelInput.trim()
+    if (t && !labels.some((l) => l.text === t)) {
+      setLabels([...labels, { text: t, color: labelColor }])
     }
     setLabelInput("")
   }
@@ -70,10 +78,7 @@ export default function NodeCreationPanel({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[998] bg-black/50 backdrop-blur-sm"
-        onClick={onCancel}
-      />
+      <div className="fixed inset-0 z-[998] bg-black/55 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 pointer-events-none">
@@ -84,17 +89,17 @@ export default function NodeCreationPanel({
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border-subtle)]">
             <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
-              New Task
+              {mode === "edit" ? "Edit Task" : "New Task"}
             </span>
             <button
-              onClick={onCancel}
+              onClick={onClose}
               className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors text-lg leading-none"
             >
               ×
             </button>
           </div>
 
-          <div className="flex flex-col gap-4 px-5 py-4">
+          <div className="flex flex-col gap-4 px-5 py-4 max-h-[70vh] overflow-y-auto">
             {/* Title */}
             <input
               ref={titleRef}
@@ -117,10 +122,7 @@ export default function NodeCreationPanel({
             {/* Department chips */}
             <Field label="Department">
               <div className="flex flex-wrap gap-1.5">
-                <ChipButton
-                  active={department === ""}
-                  onClick={() => setDepartment("")}
-                >
+                <ChipButton active={department === ""} onClick={() => setDepartment("")}>
                   None
                 </ChipButton>
                 {preset.categories.map((cat) => (
@@ -136,7 +138,7 @@ export default function NodeCreationPanel({
               </div>
             </Field>
 
-            {/* Priority segmented control */}
+            {/* Priority */}
             <Field label="Priority">
               <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
                 {PRIORITIES.map((p) => {
@@ -162,7 +164,6 @@ export default function NodeCreationPanel({
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              {/* Assignee */}
               <Field label="Assignee">
                 <input
                   value={assignee}
@@ -171,8 +172,6 @@ export default function NodeCreationPanel({
                   className={inputClass}
                 />
               </Field>
-
-              {/* Due Date */}
               <Field label="Due Date">
                 <input
                   type="date"
@@ -185,30 +184,48 @@ export default function NodeCreationPanel({
 
             {/* Labels */}
             <Field label="Labels">
-              <input
-                value={labelInput}
-                onChange={(e) => setLabelInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    addLabel()
-                  }
-                }}
-                placeholder="Type and press Enter"
-                className={inputClass}
-              />
+              <div className="flex gap-2">
+                <input
+                  value={labelInput}
+                  onChange={(e) => setLabelInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      addLabel()
+                    }
+                  }}
+                  placeholder="Type and press Enter…"
+                  className={`${inputClass} flex-1`}
+                />
+                {/* Color picker dots */}
+                <div className="flex items-center gap-1">
+                  {LABEL_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setLabelColor(c)}
+                      className={[
+                        "w-4 h-4 rounded-full shrink-0 transition-transform duration-100",
+                        labelColor === c ? "scale-125 ring-1 ring-white/50 ring-offset-1 ring-offset-[var(--color-surface-raised)]" : "opacity-60 hover:opacity-100",
+                      ].join(" ")}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
               {labels.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {labels.map((l) => (
                     <span
-                      key={l}
-                      className="inline-flex items-center gap-1 bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)] text-[11px] pl-2 pr-1 py-0.5 rounded-full"
+                      key={l.text}
+                      className="inline-flex items-center gap-1 text-[11px] pl-2 pr-1 py-0.5 rounded-full text-white/90"
+                      style={{ backgroundColor: l.color + "44" }}
                     >
-                      {l}
+                      {l.text}
                       <button
                         type="button"
-                        onClick={() => setLabels(labels.filter((x) => x !== l))}
-                        className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors w-4 h-4 flex items-center justify-center"
+                        onClick={() => setLabels(labels.filter((x) => x.text !== l.text))}
+                        className="text-white/40 hover:text-white/80 transition-colors w-4 h-4 flex items-center justify-center"
                       >
                         ×
                       </button>
@@ -222,11 +239,14 @@ export default function NodeCreationPanel({
           {/* Footer */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-border-subtle)]">
             <span className="text-[11px] text-[var(--color-text-muted)]">
-              <kbd className="px-1 py-0.5 rounded bg-[var(--color-surface-overlay)] text-[10px] font-mono">Ctrl+Enter</kbd> to create
+              <kbd className="px-1 py-0.5 rounded bg-[var(--color-surface-overlay)] text-[10px] font-mono">
+                Ctrl+Enter
+              </kbd>{" "}
+              to {mode === "edit" ? "save" : "create"}
             </span>
             <div className="flex gap-2">
               <button
-                onClick={onCancel}
+                onClick={onClose}
                 className="px-3 py-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
               >
                 Cancel
@@ -235,7 +255,7 @@ export default function NodeCreationPanel({
                 onClick={handleSubmit}
                 className="px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors duration-150"
               >
-                Create
+                {mode === "edit" ? "Save" : "Create"}
               </button>
             </div>
           </div>

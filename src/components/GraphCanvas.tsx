@@ -4,9 +4,13 @@
  * Responsibilities:
  * - Render nodes/edges with filter opacity + synthetic group edges
  * - Typed edges (blocks/relates/triggers) with click-to-cycle
- * - Double-click canvas → creation modal | Ctrl+A → creation modal at center
- * - Wire-to-create: drag from handle to empty space → creation modal
+ * - Double-click canvas → instant create node at cursor
+ * - Ctrl+A → instant create node at viewport center
+ * - Wire-to-create: drag from output handle to empty space → NodeFocusPanel (create)
+ * - F key → NodeFocusPanel (edit) for selected node
+ * - Ctrl+Z / Ctrl+Shift+Z → undo / redo
  * - Ctrl+G → create group node at viewport center
+ * - Double-click node → open TaskPanel
  * - Escape → close panels | Delete → remove selected node
  * - Group collapse → synthetic edge computation
  */
@@ -30,8 +34,8 @@ import "@xyflow/react/dist/style.css"
 
 import TaskNode from "./TaskNode"
 import GroupNode from "./GroupNode"
-import TypedEdge from "./TypedEdge"
-import NodeCreationPanel from "./NodeCreationPanel"
+import TypedEdge, { EdgeArrowDefs } from "./TypedEdge"
+import NodeFocusPanel from "./NodeFocusPanel"
 import { usePMGraphStore, getActivePreset, getFilteredNodeIds } from "../store/usePMGraphStore"
 import { getCategoryColor } from "../utils/colors"
 import type { TaskNodeData, PMEdgeData, EdgeType } from "../types"
@@ -44,8 +48,10 @@ const defaultEdgeOptions = { type: "typed" }
 // Edge type strength for synthetic edge aggregation (higher = stronger)
 const EDGE_STRENGTH: Record<EdgeType, number> = { blocks: 3, triggers: 2, relates: 1 }
 
-interface CreationState {
-  flowPos: { x: number; y: number }
+interface FocusPanelState {
+  mode: "create" | "edit"
+  nodeId?: string
+  flowPos?: { x: number; y: number }
   pendingConnection?: { source: string; sourceHandle: string | null }
 }
 
@@ -54,21 +60,31 @@ export default function GraphCanvas() {
   const edges = usePMGraphStore((s) => s.edges)
   const filters = usePMGraphStore((s) => s.filters)
   const selectedNodeId = usePMGraphStore((s) => s.selectedNodeId)
+  const taskPanelOpen = usePMGraphStore((s) => s.taskPanelOpen)
   const collapsedGroups = usePMGraphStore((s) => s.collapsedGroups)
   const onNodesChange = usePMGraphStore((s) => s.onNodesChange)
   const onEdgesChange = usePMGraphStore((s) => s.onEdgesChange)
   const addNode = usePMGraphStore((s) => s.addNode)
+  const updateNode = usePMGraphStore((s) => s.updateNode)
   const addEdge = usePMGraphStore((s) => s.addEdge)
   const removeEdge = usePMGraphStore((s) => s.removeEdge)
   const setSelectedNode = usePMGraphStore((s) => s.setSelectedNode)
+  const setTaskPanelOpen = usePMGraphStore((s) => s.setTaskPanelOpen)
   const deleteNode = usePMGraphStore((s) => s.deleteNode)
   const cycleEdgeType = usePMGraphStore((s) => s.cycleEdgeType)
   const addGroupNode = usePMGraphStore((s) => s.addGroupNode)
+  const undo = usePMGraphStore((s) => s.undo)
+  const redo = usePMGraphStore((s) => s.redo)
   const preset = usePMGraphStore((s) => getActivePreset(s))
 
   const { screenToFlowPosition } = useReactFlow()
-  const [creation, setCreation] = useState<CreationState | null>(null)
+  const [focusPanel, setFocusPanel] = useState<FocusPanelState | null>(null)
+
+  // connectingRef: tracks the source node/handle for wire-to-create
+  // connectionMadeRef: set true when onConnect fires (real connection), so
+  // onConnectEnd knows NOT to open the creation panel
   const connectingRef = useRef<{ nodeId: string; handleId: string | null } | null>(null)
+  const connectionMadeRef = useRef(false)
 
   // ── Filter opacity ─────────────────────────────────────────────────
   const visibleIds = useMemo(
@@ -161,66 +177,77 @@ export default function GraphCanvas() {
     return [...realEdges, ...Array.from(syntheticMap.values())]
   }, [edges, nodes, collapsedGroups, visibleIds])
 
-  // ── Node creation ──────────────────────────────────────────────────
+  // ── NodeFocusPanel callbacks ────────────────────────────────────────
 
-  const handleCreationSubmit = useCallback(
+  const handleFocusPanelSubmit = useCallback(
     (data: Partial<TaskNodeData>) => {
-      if (!creation) return
-      const newId = addNode(creation.flowPos, data)
-      // Wire-to-create: auto-connect if pending connection
-      if (creation.pendingConnection) {
-        addEdge({
-          source: creation.pendingConnection.source,
-          target: newId,
-          sourceHandle: creation.pendingConnection.sourceHandle,
-          targetHandle: "in",
-        } as Connection)
+      if (!focusPanel) return
+      if (focusPanel.mode === "edit" && focusPanel.nodeId) {
+        updateNode(focusPanel.nodeId, data)
+      } else if (focusPanel.flowPos) {
+        const newId = addNode(focusPanel.flowPos, data)
+        if (focusPanel.pendingConnection) {
+          addEdge({
+            source: focusPanel.pendingConnection.source,
+            target: newId,
+            sourceHandle: focusPanel.pendingConnection.sourceHandle,
+            targetHandle: "in",
+          } as Connection)
+        }
       }
-      setCreation(null)
+      setFocusPanel(null)
     },
-    [creation, addNode, addEdge]
+    [focusPanel, updateNode, addNode, addEdge]
   )
 
-  const handleCreationCancel = useCallback(() => {
-    setCreation(null)
-  }, [])
+  const handleFocusPanelClose = useCallback(() => setFocusPanel(null), [])
 
-  // Double-click canvas pane → open creation modal
+  // ── Canvas double-click → open NodeFocusPanel at cursor ─────────────
   const handleCanvasDoubleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       const target = event.target as HTMLElement
       if (!target.classList.contains("react-flow__pane")) return
-      const flowPos = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      })
-      setCreation({ flowPos })
+      const flowPos = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+      setFocusPanel({ mode: "create", flowPos })
     },
     [screenToFlowPosition]
   )
 
   // ── Wire-to-create ────────────────────────────────────────────────
 
+  // Only track source handles — target handles should not trigger wire-to-create
   const onConnectStart: OnConnectStart = useCallback((_event, params) => {
+    if (params.handleType !== "source") return
     connectingRef.current = {
       nodeId: params.nodeId!,
       handleId: params.handleId ?? null,
     }
   }, [])
 
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      connectionMadeRef.current = true
+      addEdge(connection)
+    },
+    [addEdge]
+  )
+
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent) => {
       const target = event.target as HTMLElement
-      // Check if dropped on empty space (not a handle or node)
+      // Open creation panel only when:
+      // 1. No real connection was made (connectionMadeRef is false)
+      // 2. Dropped directly on the pane (not a node or handle)
       if (
-        target.classList.contains("react-flow__pane") ||
-        target.closest(".react-flow__pane")?.classList.contains("react-flow__pane")
+        !connectionMadeRef.current &&
+        connectingRef.current &&
+        target.classList.contains("react-flow__pane")
       ) {
-        if (!connectingRef.current) return
         const clientX = "clientX" in event ? event.clientX : event.changedTouches[0].clientX
         const clientY = "clientY" in event ? event.clientY : event.changedTouches[0].clientY
         const flowPos = screenToFlowPosition({ x: clientX, y: clientY })
-        setCreation({
+        setFocusPanel({
+          mode: "create",
           flowPos,
           pendingConnection: {
             source: connectingRef.current.nodeId,
@@ -229,6 +256,7 @@ export default function GraphCanvas() {
         })
       }
       connectingRef.current = null
+      connectionMadeRef.current = false
     },
     [screenToFlowPosition]
   )
@@ -241,8 +269,10 @@ export default function GraphCanvas() {
       const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 
       if (e.key === "Escape") {
-        if (creation) {
-          setCreation(null)
+        if (focusPanel) {
+          setFocusPanel(null)
+        } else if (taskPanelOpen) {
+          setTaskPanelOpen(false)
         } else if (selectedNodeId) {
           setSelectedNode(null)
         }
@@ -255,15 +285,32 @@ export default function GraphCanvas() {
         return
       }
 
+      if (e.ctrlKey && e.shiftKey && e.key === "Z" && !isInput) {
+        e.preventDefault()
+        redo()
+        return
+      }
+
+      if (e.ctrlKey && e.key === "z" && !isInput) {
+        e.preventDefault()
+        undo()
+        return
+      }
+
       if (e.ctrlKey && e.key === "a" && !isInput) {
         e.preventDefault()
         const el = document.querySelector(".react-flow__pane") as HTMLElement
         if (!el) return
         const rect = el.getBoundingClientRect()
-        const cx = rect.left + rect.width / 2
-        const cy = rect.top + rect.height / 2
-        const flowPos = screenToFlowPosition({ x: cx, y: cy })
-        setCreation({ flowPos })
+        const flowPos = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+        setFocusPanel({ mode: "create", flowPos })
+        return
+      }
+
+      if (e.key === "f" && !isInput && selectedNodeId) {
+        e.preventDefault()
+        setFocusPanel({ mode: "edit", nodeId: selectedNodeId })
+        return
       }
 
       if (e.ctrlKey && e.key === "g" && !isInput) {
@@ -271,15 +318,17 @@ export default function GraphCanvas() {
         const el = document.querySelector(".react-flow__pane") as HTMLElement
         if (!el) return
         const rect = el.getBoundingClientRect()
-        const cx = rect.left + rect.width / 2
-        const cy = rect.top + rect.height / 2
-        const flowPos = screenToFlowPosition({ x: cx, y: cy })
+        const flowPos = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
         addGroupNode(flowPos, "New Group", "#6b7280")
       }
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [screenToFlowPosition, creation, selectedNodeId, setSelectedNode, deleteNode, addGroupNode])
+  }, [
+    focusPanel, taskPanelOpen, selectedNodeId,
+    screenToFlowPosition, setSelectedNode, setTaskPanelOpen,
+    deleteNode, addNode, addGroupNode, undo, redo,
+  ])
 
   // ── Selection ──────────────────────────────────────────────────────
 
@@ -290,18 +339,20 @@ export default function GraphCanvas() {
     [setSelectedNode]
   )
 
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+    (_, node) => {
+      setSelectedNode(node.id)
+      setTaskPanelOpen(true)
+    },
+    [setSelectedNode, setTaskPanelOpen]
+  )
+
   const onPaneClick = useCallback(() => {
     setSelectedNode(null)
-  }, [setSelectedNode])
+    setTaskPanelOpen(false)
+  }, [setSelectedNode, setTaskPanelOpen])
 
   // ── Edge interactions ──────────────────────────────────────────────
-
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      addEdge(connection)
-    },
-    [addEdge]
-  )
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_, edge) => {
@@ -331,6 +382,7 @@ export default function GraphCanvas() {
 
   return (
     <div className="w-full h-full relative" onDoubleClick={handleCanvasDoubleClick}>
+      <EdgeArrowDefs />
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -342,6 +394,7 @@ export default function GraphCanvas() {
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={onPaneClick}
         onEdgeClick={onEdgeClick}
         onEdgeDoubleClick={onEdgeDoubleClick}
@@ -372,21 +425,27 @@ export default function GraphCanvas() {
       </ReactFlow>
 
       {/* Empty state */}
-      {nodes.length === 0 && !creation && (
+      {nodes.length === 0 && !focusPanel && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <p className="text-[var(--color-text-muted)] text-sm">
-              No tasks yet. Double-click or <kbd className="px-1.5 py-0.5 rounded bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)] text-xs font-mono">Ctrl+A</kbd> to create one.
+              No tasks yet. Double-click or{" "}
+              <kbd className="px-1.5 py-0.5 rounded bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)] text-xs font-mono">
+                Ctrl+A
+              </kbd>{" "}
+              to create one.
             </p>
           </div>
         </div>
       )}
 
-      {/* Creation modal */}
-      {creation && (
-        <NodeCreationPanel
-          onSubmit={handleCreationSubmit}
-          onCancel={handleCreationCancel}
+      {/* NodeFocusPanel — create or edit */}
+      {focusPanel && (
+        <NodeFocusPanel
+          mode={focusPanel.mode}
+          nodeId={focusPanel.nodeId}
+          onSubmit={handleFocusPanelSubmit}
+          onClose={handleFocusPanelClose}
         />
       )}
     </div>

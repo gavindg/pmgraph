@@ -4,12 +4,17 @@ export type Priority = "low" | "medium" | "high"
 // Empty string means uncategorized.
 export type Department = string
 
+export type LabelItem = {
+  text: string
+  color: string // hex, e.g. "#3b82f6"
+}
+
 export type TaskNodeData = {
   title: string
   description: string
   priority: Priority
   department: Department
-  labels: string[]
+  labels: LabelItem[]
   assignee: string
   dueDate: string | null
   // Allows React Flow to treat this as a Record<string, unknown>

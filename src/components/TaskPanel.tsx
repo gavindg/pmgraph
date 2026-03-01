@@ -11,17 +11,17 @@
  */
 import { useState, useRef, useEffect } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS } from "../utils/colors"
-import type { Priority, TaskNodeData } from "../types"
+import { PRIORITY_COLORS, LABEL_COLORS } from "../utils/colors"
+import type { Priority, TaskNodeData, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
 
-export default function TaskPanel() {
+export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
   const nodes = usePMGraphStore((s) => s.nodes)
   const selectedNodeId = usePMGraphStore((s) => s.selectedNodeId)
   const updateNode = usePMGraphStore((s) => s.updateNode)
   const deleteNode = usePMGraphStore((s) => s.deleteNode)
-  const setSelectedNode = usePMGraphStore((s) => s.setSelectedNode)
+  const setTaskPanelOpen = usePMGraphStore((s) => s.setTaskPanelOpen)
   const preset = usePMGraphStore((s) => getActivePreset(s))
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
@@ -37,18 +37,19 @@ export default function TaskPanel() {
         "w-80 shrink-0 flex flex-col bg-[var(--color-surface-raised)]/95 backdrop-blur-md",
         "border-l border-[var(--color-border-default)] overflow-y-auto overflow-x-hidden",
         "transform transition-transform duration-200 ease-out",
+        isOpen ? "translate-x-0" : "translate-x-full",
       ].join(" ")}
     >
       {!data ? null : (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border-subtle)]">
-            <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+            <span className="text-[10px] uppercase tracking-widest text-text-muted">
               Task Details
             </span>
             <button
-              onClick={() => setSelectedNode(null)}
-              className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors text-lg leading-none"
+              onClick={() => setTaskPanelOpen(false)}
+              className="text-text-muted hover:text-text-primary transition-colors text-lg leading-none"
             >
               ×
             </button>
@@ -150,7 +151,7 @@ export default function TaskPanel() {
 
             <Field label="Labels">
               <LabelEditor
-                labels={data.labels as string[]}
+                labels={data.labels as LabelItem[]}
                 onChange={(labels) => update({ labels })}
               />
             </Field>
@@ -255,44 +256,62 @@ function LabelEditor({
   labels,
   onChange,
 }: {
-  labels: string[]
-  onChange: (labels: string[]) => void
+  labels: LabelItem[]
+  onChange: (labels: LabelItem[]) => void
 }) {
   const [input, setInput] = useState("")
+  const [color, setColor] = useState<string>(LABEL_COLORS[0])
 
   const addLabel = () => {
     const trimmed = input.trim()
-    if (trimmed && !labels.includes(trimmed)) {
-      onChange([...labels, trimmed])
+    if (trimmed && !labels.some((l) => l.text === trimmed)) {
+      onChange([...labels, { text: trimmed, color }])
     }
     setInput("")
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <input
-        className={inputClass}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault()
-            addLabel()
-          }
-        }}
-        placeholder="Type and press Enter"
-      />
+      <div className="flex gap-2">
+        <input
+          className={`${inputClass} flex-1`}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              addLabel()
+            }
+          }}
+          placeholder="Type and press Enter"
+        />
+        <div className="flex items-center gap-1">
+          {LABEL_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              className={[
+                "w-3.5 h-3.5 rounded-full shrink-0 transition-transform duration-100",
+                color === c ? "scale-125 ring-1 ring-white/50 ring-offset-1 ring-offset-[var(--color-surface-raised)]" : "opacity-50 hover:opacity-100",
+              ].join(" ")}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      </div>
       {labels.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {labels.map((l) => (
             <span
-              key={l}
-              className="inline-flex items-center gap-1 bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)] text-[11px] pl-2 pr-1 py-0.5 rounded-full"
+              key={l.text}
+              className="inline-flex items-center gap-1 text-white/90 text-[11px] pl-2 pr-1 py-0.5 rounded-full"
+              style={{ backgroundColor: l.color + "44" }}
             >
-              {l}
+              {l.text}
               <button
-                onClick={() => onChange(labels.filter((x) => x !== l))}
-                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors w-4 h-4 flex items-center justify-center"
+                onClick={() => onChange(labels.filter((x) => x.text !== l.text))}
+                className="text-white/40 hover:text-white/80 transition-colors w-4 h-4 flex items-center justify-center"
               >
                 ×
               </button>
