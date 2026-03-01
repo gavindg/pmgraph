@@ -189,8 +189,8 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
                 value={data.department as string}
                 onChange={(v) => update({ department: v })}
                 onSelect={(v) => update({ department: v })}
-                suggestions={preset.categories.map((c) => c.name)}
-                colors={Object.fromEntries(preset.categories.map((c) => [c.name, c.color]))}
+                suggestions={["N/A", ...preset.categories.map((c) => c.name)]}
+                colors={{ "N/A": "#6b7280", ...Object.fromEntries(preset.categories.map((c) => [c.name, c.color])) }}
                 placeholder="Select department…"
                 className={inputClass}
               />

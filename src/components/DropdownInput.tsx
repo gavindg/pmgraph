@@ -71,15 +71,10 @@ export default function DropdownInput({
   }, [highlightIdx])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Tab cycles through options when dropdown is open
-    if (e.key === "Tab" && filtered.length > 0) {
+    // Tab cycles through options only when dropdown is already open
+    if (e.key === "Tab" && open && filtered.length > 0) {
       e.preventDefault()
-      if (!open) {
-        setOpen(true)
-        setHighlightIdx(0)
-      } else {
-        setHighlightIdx((i) => (i + 1) % filtered.length)
-      }
+      setHighlightIdx((i) => (i + 1) % filtered.length)
       return
     }
 
