@@ -1,208 +1,308 @@
 /**
- * TaskPanel — Right-side panel for editing a selected task node.
+ * TaskPanel — Polished right-side panel for editing a selected task.
  *
- * Opens when a node is selected (selectedNodeId !== null).
- * All field changes call updateNode immediately for live updates.
+ * Features:
+ * - Slide-in/out animation via isOpen prop
+ * - Inline editable title
+ * - Priority as segmented control
+ * - Department as colored chip buttons (from active preset)
+ * - Labels as tag pills with remove
+ * - Clean section grouping
  */
-import { usePMGraphStore } from "../store/usePMGraphStore"
-import type { Department, Priority, TaskNodeData } from "../types"
+import { useState, useRef, useEffect } from "react"
+import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
+import { PRIORITY_COLORS } from "../utils/colors"
+import type { Priority, TaskNodeData } from "../types"
 
-const DEPARTMENTS: Department[] = ["", "Programming", "Art", "Design", "Audio", "QA"]
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
 
-const DEPT_COLOR: Record<Department, string> = {
-  "": "text-gray-400",
-  Programming: "text-blue-400",
-  Art: "text-pink-400",
-  Design: "text-purple-400",
-  Audio: "text-yellow-400",
-  QA: "text-green-400",
-}
-
-const PRIORITY_COLOR: Record<Priority, string> = {
-  low: "text-green-400",
-  medium: "text-yellow-400",
-  high: "text-red-400",
-}
-
 export default function TaskPanel() {
-  const { nodes, selectedNodeId, updateNode, deleteNode, setSelectedNode } =
-    usePMGraphStore()
+  const nodes = usePMGraphStore((s) => s.nodes)
+  const selectedNodeId = usePMGraphStore((s) => s.selectedNodeId)
+  const updateNode = usePMGraphStore((s) => s.updateNode)
+  const deleteNode = usePMGraphStore((s) => s.deleteNode)
+  const setSelectedNode = usePMGraphStore((s) => s.setSelectedNode)
+  const preset = usePMGraphStore((s) => getActivePreset(s))
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
-  if (!selectedNode) return null
+  const data = selectedNode?.data as TaskNodeData | undefined
 
-  const data = selectedNode.data as TaskNodeData
-
-  // Generic field updater
-  const update = (patch: Partial<TaskNodeData>) => updateNode(selectedNode.id, patch)
-
-  const handleDelete = () => {
-    deleteNode(selectedNode.id)
-    // setSelectedNode(null) is handled inside deleteNode
+  const update = (patch: Partial<TaskNodeData>) => {
+    if (selectedNode) updateNode(selectedNode.id, patch)
   }
 
   return (
-    <aside className="w-80 shrink-0 flex flex-col bg-gray-900 border-l border-gray-700 overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-        <h2 className="text-sm font-semibold text-gray-200">Task Details</h2>
-        <button
-          onClick={() => setSelectedNode(null)}
-          className="text-gray-400 hover:text-gray-200 transition-colors text-lg leading-none"
-          title="Close panel"
-        >
-          ×
-        </button>
-      </div>
+    <aside
+      className={[
+        "w-80 shrink-0 flex flex-col bg-[var(--color-surface-raised)]/95 backdrop-blur-md",
+        "border-l border-[var(--color-border-default)] overflow-y-auto overflow-x-hidden",
+        "transform transition-transform duration-200 ease-out",
+      ].join(" ")}
+    >
+      {!data ? null : (
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border-subtle)]">
+            <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
+              Task Details
+            </span>
+            <button
+              onClick={() => setSelectedNode(null)}
+              className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
 
-      {/* Fields */}
-      <div className="flex-1 flex flex-col gap-4 px-4 py-4">
-        {/* Title */}
-        <Field label="Title">
-          <input
-            className={inputClass}
-            value={data.title}
-            onChange={(e) => update({ title: e.target.value })}
-            placeholder="Task title"
-          />
-        </Field>
+          <div className="flex-1 flex flex-col gap-5 px-4 py-4">
+            {/* ── Identity ─────────────────────────────────────── */}
+            <EditableTitle
+              value={data.title as string}
+              onChange={(title) => update({ title })}
+            />
 
-        {/* Description */}
-        <Field label="Description">
-          <textarea
-            className={`${inputClass} resize-none h-20`}
-            value={data.description}
-            onChange={(e) => update({ description: e.target.value })}
-            placeholder="What needs to be done?"
-          />
-        </Field>
+            <Field label="Description">
+              <textarea
+                className={`${inputClass} resize-none h-20`}
+                value={data.description as string}
+                onChange={(e) => update({ description: e.target.value })}
+                placeholder="What needs to be done?"
+              />
+            </Field>
 
-        {/* Priority */}
-        <Field label="Priority">
-          <select
-            className={inputClass}
-            value={data.priority}
-            onChange={(e) => update({ priority: e.target.value as Priority })}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </option>
-            ))}
-          </select>
-          <span className={`text-xs mt-1 ${PRIORITY_COLOR[data.priority]}`}>
-            {data.priority}
-          </span>
-        </Field>
+            <hr className="border-[var(--color-border-subtle)]" />
 
-        {/* Department */}
-        <Field label="Department">
-          <select
-            className={inputClass}
-            value={data.department}
-            onChange={(e) => update({ department: e.target.value as Department })}
-          >
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>
-                {d || "None"}
-              </option>
-            ))}
-          </select>
-          <span className={`text-xs mt-1 ${DEPT_COLOR[data.department]}`}>
-            {data.department || "None"}
-          </span>
-        </Field>
+            {/* ── Classification ────────────────────────────────── */}
+            <SectionHeader>Classification</SectionHeader>
 
-        {/* Assignee */}
-        <Field label="Assignee">
-          <input
-            className={inputClass}
-            value={data.assignee}
-            onChange={(e) => update({ assignee: e.target.value })}
-            placeholder="Who owns this?"
-          />
-        </Field>
+            {/* Priority — segmented control */}
+            <Field label="Priority">
+              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
+                {PRIORITIES.map((p) => {
+                  const active = data.priority === p
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => update({ priority: p })}
+                      className={[
+                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
+                        active
+                          ? "text-white"
+                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+                      ].join(" ")}
+                      style={active ? { backgroundColor: PRIORITY_COLORS[p].bg } : {}}
+                    >
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
 
-        {/* Labels */}
-        <Field label="Labels" hint="comma-separated">
-          <input
-            className={inputClass}
-            value={data.labels.join(", ")}
-            onChange={(e) =>
-              update({
-                labels: e.target.value
-                  .split(",")
-                  .map((l) => l.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="bug, blocking, art-pass"
-          />
-          {data.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {data.labels.map((l) => (
-                <span
-                  key={l}
-                  className="text-[10px] bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded"
+            {/* Department — color chips */}
+            <Field label="Department">
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => update({ department: "" })}
+                  className={[
+                    "text-xs px-2.5 py-1 rounded-full border transition-colors duration-150",
+                    data.department === ""
+                      ? "bg-[var(--color-surface-overlay)] text-[var(--color-text-primary)] border-[var(--color-border-default)]"
+                      : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+                  ].join(" ")}
                 >
-                  {l}
-                </span>
-              ))}
-            </div>
-          )}
-        </Field>
+                  None
+                </button>
+                {preset.categories.map((cat) => {
+                  const active = data.department === cat.name
+                  return (
+                    <button
+                      key={cat.name}
+                      onClick={() => update({ department: cat.name })}
+                      className={[
+                        "text-xs px-2.5 py-1 rounded-full border transition-colors duration-150",
+                        active
+                          ? "text-white border-transparent"
+                          : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+                      ].join(" ")}
+                      style={active ? { backgroundColor: cat.color } : {}}
+                    >
+                      {cat.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
 
-        {/* Due Date */}
-        <Field label="Due Date">
-          <input
-            type="date"
-            className={inputClass}
-            value={data.dueDate ?? ""}
-            onChange={(e) =>
-              update({ dueDate: e.target.value || null })
-            }
-          />
-        </Field>
-      </div>
+            <hr className="border-[var(--color-border-subtle)]" />
 
-      {/* Footer actions */}
-      <div className="px-4 py-3 border-t border-gray-700">
-        <button
-          onClick={handleDelete}
-          className="w-full py-1.5 rounded text-sm font-medium bg-red-900/40 text-red-400 hover:bg-red-900/70 border border-red-800/50 transition-colors"
-        >
-          Delete Task
-        </button>
-        <p className="text-[10px] text-gray-600 mt-2 text-center">
-          ID: {selectedNode.id.slice(0, 8)}…
-        </p>
-      </div>
+            {/* ── Metadata ──────────────────────────────────────── */}
+            <SectionHeader>Metadata</SectionHeader>
+
+            <Field label="Assignee">
+              <input
+                className={inputClass}
+                value={data.assignee as string}
+                onChange={(e) => update({ assignee: e.target.value })}
+                placeholder="Who owns this?"
+              />
+            </Field>
+
+            <Field label="Labels">
+              <LabelEditor
+                labels={data.labels as string[]}
+                onChange={(labels) => update({ labels })}
+              />
+            </Field>
+
+            <Field label="Due Date">
+              <input
+                type="date"
+                className={inputClass}
+                value={(data.dueDate as string) ?? ""}
+                onChange={(e) => update({ dueDate: e.target.value || null })}
+              />
+            </Field>
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-3 border-t border-[var(--color-border-subtle)]">
+            <button
+              onClick={() => {
+                if (selectedNode) deleteNode(selectedNode.id)
+              }}
+              className="w-full py-1.5 rounded-md text-xs font-medium bg-red-950/50 text-red-400 hover:bg-red-950/80 border border-red-900/30 transition-colors duration-150"
+            >
+              Delete Task
+            </button>
+          </div>
+        </>
+      )}
     </aside>
   )
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] -mb-2">
+      {children}
+    </span>
+  )
+}
+
 function Field({
   label,
-  hint,
   children,
 }: {
   label: string
-  hint?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[11px] font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
         {label}
-        {hint && <span className="ml-1 normal-case text-gray-600">({hint})</span>}
       </label>
       {children}
     </div>
   )
 }
 
+function EditableTitle({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (v: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editing])
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="text-base font-semibold bg-transparent border-none outline-none text-[var(--color-text-primary)] px-0 py-0 w-full"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setEditing(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setEditing(false)
+        }}
+      />
+    )
+  }
+
+  return (
+    <h3
+      onClick={() => setEditing(true)}
+      className="text-base font-semibold text-[var(--color-text-primary)] cursor-text hover:bg-white/5 rounded px-1 -mx-1 py-0.5 transition-colors duration-150"
+    >
+      {value || "Untitled"}
+    </h3>
+  )
+}
+
+function LabelEditor({
+  labels,
+  onChange,
+}: {
+  labels: string[]
+  onChange: (labels: string[]) => void
+}) {
+  const [input, setInput] = useState("")
+
+  const addLabel = () => {
+    const trimmed = input.trim()
+    if (trimmed && !labels.includes(trimmed)) {
+      onChange([...labels, trimmed])
+    }
+    setInput("")
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        className={inputClass}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault()
+            addLabel()
+          }
+        }}
+        placeholder="Type and press Enter"
+      />
+      {labels.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {labels.map((l) => (
+            <span
+              key={l}
+              className="inline-flex items-center gap-1 bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)] text-[11px] pl-2 pr-1 py-0.5 rounded-full"
+            >
+              {l}
+              <button
+                onClick={() => onChange(labels.filter((x) => x !== l))}
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors w-4 h-4 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const inputClass =
-  "bg-gray-800 border border-gray-700 text-gray-100 text-sm rounded px-2.5 py-1.5 w-full focus:outline-none focus:border-gray-500 placeholder-gray-600"
+  "bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] text-sm rounded-md px-2.5 py-1.5 w-full focus:outline-none focus:border-[var(--color-text-muted)] placeholder-[var(--color-text-muted)] transition-colors duration-150"

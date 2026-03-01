@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react"
-import type { TaskNodeData, Department } from "../types"
+import type { TaskNodeData, GroupNodeData } from "../types"
 
 export function generateId(): string {
   return crypto.randomUUID()
@@ -7,21 +7,39 @@ export function generateId(): string {
 
 export function createDefaultNode(
   position: { x: number; y: number },
-  title: string,
-  department: Department = ""
+  data: Partial<TaskNodeData> = {}
 ): Node<TaskNodeData> {
   return {
     id: generateId(),
     type: "task",
     position,
     data: {
-      title,
+      title: "Untitled",
       description: "",
       priority: "medium",
-      department,
+      department: "",
       labels: [],
       assignee: "",
       dueDate: null,
+      ...data,
+    },
+  }
+}
+
+export function createGroupNode(
+  position: { x: number; y: number },
+  title: string,
+  color: string
+): Node<GroupNodeData> {
+  return {
+    id: generateId(),
+    type: "group",
+    position,
+    style: { width: 400, height: 300 },
+    data: {
+      title,
+      color,
+      collapsed: false,
     },
   }
 }

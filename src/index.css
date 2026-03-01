@@ -1,6 +1,38 @@
 @import "tailwindcss";
 
-/* ── Base reset for full-viewport app layout ─────────────────────── */
+/* ── Design Tokens ────────────────────────────────────────────────── */
+@theme {
+  /* Surface */
+  --color-surface-base: #030712;
+  --color-surface-raised: #111827;
+  --color-surface-overlay: #1f2937;
+
+  /* Border */
+  --color-border-default: #374151;
+  --color-border-subtle: #1f2937;
+
+  /* Text */
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+
+  /* Radius */
+  --radius-node: 12px;
+  --radius-panel: 8px;
+  --radius-button: 6px;
+
+  /* Shadow */
+  --shadow-node: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-node-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-node-drag: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Transitions */
+  --transition-fast: 150ms ease-out;
+  --transition-default: 200ms ease-out;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -15,38 +47,64 @@ body,
   padding: 0;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #030712; /* gray-950 */
-  color: #f9fafb; /* gray-50 */
+  background-color: var(--color-surface-base);
+  color: var(--color-text-primary);
 }
 
 /* ── React Flow overrides ────────────────────────────────────────── */
-/* Keep the flow pane background transparent so our bg-gray-950 shows */
 .react-flow__renderer {
   background: transparent;
 }
 
-/* Style the edge delete button (shown on hover) */
 .react-flow__edge-path {
   cursor: pointer;
 }
 
-/* Remove default blue selection box color */
 .react-flow__selection {
-  border-color: #4b5563;
-  background: rgba(75, 85, 99, 0.1);
+  border-color: var(--color-border-default);
+  background: rgba(75, 85, 99, 0.08);
 }
 
-/* Controls panel */
+/* Cursor states */
+.react-flow__pane {
+  cursor: grab;
+}
+.react-flow__pane:active {
+  cursor: grabbing;
+}
+.react-flow__node {
+  cursor: pointer;
+}
+.react-flow__handle {
+  cursor: crosshair;
+  transition: all var(--transition-fast);
+}
+.react-flow__handle:hover {
+  transform: scale(1.4);
+  background: rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+}
+
+/* Controls */
 .react-flow__controls-button {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
-  fill: #9ca3af !important;
+  background: var(--color-surface-overlay) !important;
+  border-color: var(--color-border-default) !important;
+  fill: var(--color-text-secondary) !important;
 }
 .react-flow__controls-button:hover {
-  background: #374151 !important;
+  background: var(--color-border-default) !important;
 }
 
 /* MiniMap */
 .react-flow__minimap-node {
   stroke-width: 0;
+}
+
+/* ── Blocker edge pulse ──────────────────────────────────────────── */
+@keyframes blocker-pulse {
+  0%, 100% { filter: drop-shadow(0 0 2px #ef4444); }
+  50%      { filter: drop-shadow(0 0 6px #ef444466); }
+}
+.edge-blocker .react-flow__edge-path {
+  animation: blocker-pulse 2.5s ease-in-out infinite;
 }

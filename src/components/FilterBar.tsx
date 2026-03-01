@@ -1,41 +1,23 @@
 /**
- * FilterBar — Top filter controls wired to the Zustand store.
- *
- * Filtering behavior:
- * - Department toggles: multi-select, empty = show all
- * - Priority select: "" = show all
- * - Assignee text: live substring search (case-insensitive)
- * - Nodes NOT matching filters → opacity 0.15 (applied in GraphCanvas)
+ * FilterBar — Compact top filter strip with search, preset selector,
+ * department toggles, and priority segmented buttons.
  */
-import { usePMGraphStore } from "../store/usePMGraphStore"
-import type { Department, Priority } from "../types"
+import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
+import { PRIORITY_COLORS } from "../utils/colors"
+import { PRESETS } from "../utils/presets"
+import type { Priority } from "../types"
 
-const DEPARTMENTS: { value: Department; label: string }[] = [
-  { value: "", label: "None" },
-  { value: "Programming", label: "Programming" },
-  { value: "Art", label: "Art" },
-  { value: "Design", label: "Design" },
-  { value: "Audio", label: "Audio" },
-  { value: "QA", label: "QA" },
-]
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
 
-const DEPT_ACTIVE: Record<Department, string> = {
-  "": "bg-gray-500 text-white border-gray-400",
-  Programming: "bg-blue-600 text-white border-blue-500",
-  Art: "bg-pink-600 text-white border-pink-500",
-  Design: "bg-purple-600 text-white border-purple-500",
-  Audio: "bg-yellow-600 text-white border-yellow-500",
-  QA: "bg-green-600 text-white border-green-500",
-}
-
-const DEPT_INACTIVE =
-  "bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700 hover:text-gray-200"
-
 export default function FilterBar() {
-  const { filters, setFilters, clearFilters } = usePMGraphStore()
+  const filters = usePMGraphStore((s) => s.filters)
+  const setFilters = usePMGraphStore((s) => s.setFilters)
+  const clearFilters = usePMGraphStore((s) => s.clearFilters)
+  const activePresetId = usePMGraphStore((s) => s.activePresetId)
+  const setPreset = usePMGraphStore((s) => s.setPreset)
+  const preset = usePMGraphStore((s) => getActivePreset(s))
 
-  const toggleDept = (dept: Department) => {
+  const toggleDept = (dept: string) => {
     const current = filters.departments
     const next = current.includes(dept)
       ? current.filter((d) => d !== dept)
@@ -46,82 +28,128 @@ export default function FilterBar() {
   const hasActiveFilters =
     filters.departments.length > 0 ||
     filters.priority !== "" ||
-    filters.assignee !== ""
+    filters.assignee !== "" ||
+    filters.search !== ""
 
   return (
-    <header className="flex items-center gap-3 px-4 py-2 bg-gray-900 border-b border-gray-700 shrink-0 flex-wrap">
+    <header className="flex items-center gap-2.5 px-4 py-1.5 bg-surface-raised border-b border-border-default shrink-0 flex-wrap">
       {/* App title */}
-      <span className="text-sm font-bold text-gray-200 mr-1 shrink-0">PMGraph</span>
+      <span className="text-sm font-bold text-text-primary shrink-0">
+        PMGraph
+      </span>
 
-      {/* Divider */}
-      <span className="text-gray-700 text-xs shrink-0">|</span>
+      {/* Preset selector */}
+      <select
+        className="bg-surface-overlay border border-border-default text-text-secondary text-[11px] rounded-md px-1.5 py-0.5 focus:outline-none"
+        value={activePresetId}
+        onChange={(e) => setPreset(e.target.value)}
+      >
+        {PRESETS.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}
+          </option>
+        ))}
+      </select>
 
-      {/* Department toggles */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-xs text-gray-500 shrink-0">Dept:</span>
-        {DEPARTMENTS.map(({ value, label }) => {
-          const active = filters.departments.includes(value)
+      <span className="text-border-default text-xs shrink-0">|</span>
+
+      {/* Search */}
+      <input
+        className="bg-surface-overlay border border-border-default text-text-primary text-xs rounded-md px-2 py-0.5 w-36 focus:outline-none focus:border--text-muted placeholder-text-muted transition-colors"
+        placeholder="Search tasks..."
+        value={filters.search}
+        onChange={(e) => setFilters({ search: e.target.value })}
+      />
+
+      <span className="text-[var(--color-border-default)] text-xs shrink-0 hidden sm:block">|</span>
+
+      {/* Department toggles — dynamic from preset */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {/* None toggle */}
+        <button
+          onClick={() => toggleDept("")}
+          className={[
+            "text-[11px] px-2 py-0.5 rounded-full border transition-colors duration-150",
+            filters.departments.includes("")
+              ? "text-white border-transparent"
+              : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+          ].join(" ")}
+          style={
+            filters.departments.includes("")
+              ? { backgroundColor: "#6b7280" }
+              : {}
+          }
+        >
+          None
+        </button>
+        {preset.categories.map((cat) => {
+          const active = filters.departments.includes(cat.name)
           return (
             <button
-              key={value}
-              onClick={() => toggleDept(value)}
+              key={cat.name}
+              onClick={() => toggleDept(cat.name)}
               className={[
-                "text-xs px-2 py-0.5 rounded border font-medium transition-colors",
-                active ? DEPT_ACTIVE[value] : DEPT_INACTIVE,
+                "text-[11px] px-2 py-0.5 rounded-full border transition-colors duration-150",
+                active
+                  ? "text-white border-transparent"
+                  : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
               ].join(" ")}
+              style={active ? { backgroundColor: cat.color } : {}}
             >
-              {label}
+              {cat.name}
             </button>
           )
         })}
       </div>
 
-      {/* Divider */}
-      <span className="text-gray-700 text-xs shrink-0 hidden sm:block">|</span>
+      <span className="text-[var(--color-border-default)] text-xs shrink-0 hidden md:block">|</span>
 
-      {/* Priority select */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-xs text-gray-500">Priority:</span>
-        <select
-          className="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded px-2 py-0.5 focus:outline-none focus:border-gray-500"
-          value={filters.priority}
-          onChange={(e) =>
-            setFilters({ priority: e.target.value as Priority | "" })
-          }
+      {/* Priority — small segmented buttons */}
+      <div className="flex items-center rounded-md overflow-hidden border border-[var(--color-border-default)]">
+        <button
+          onClick={() => setFilters({ priority: "" })}
+          className={[
+            "text-[11px] px-2 py-0.5 transition-colors duration-150",
+            filters.priority === ""
+              ? "bg-[var(--color-surface-overlay)] text-[var(--color-text-primary)]"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+          ].join(" ")}
         >
-          <option value="">All</option>
-          {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
+          All
+        </button>
+        {PRIORITIES.map((p) => {
+          const active = filters.priority === p
+          return (
+            <button
+              key={p}
+              onClick={() => setFilters({ priority: active ? "" : p })}
+              className={[
+                "text-[11px] px-2 py-0.5 transition-colors duration-150",
+                active
+                  ? "text-white"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+              ].join(" ")}
+              style={active ? { backgroundColor: PRIORITY_COLORS[p].bg } : {}}
+            >
               {p.charAt(0).toUpperCase() + p.slice(1)}
-            </option>
-          ))}
-        </select>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Assignee search */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-xs text-gray-500">Assignee:</span>
-        <input
-          className="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded px-2 py-0.5 w-28 focus:outline-none focus:border-gray-500 placeholder-gray-600"
-          placeholder="Search…"
-          value={filters.assignee}
-          onChange={(e) => setFilters({ assignee: e.target.value })}
-        />
-      </div>
-
-      {/* Clear button — only shown when filters are active */}
+      {/* Clear */}
       {hasActiveFilters && (
         <button
           onClick={clearFilters}
-          className="ml-auto text-xs text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 px-2 py-0.5 rounded transition-colors"
+          className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors ml-auto"
         >
-          Clear filters
+          Clear
         </button>
       )}
 
-      {/* Keyboard hint */}
-      <span className="ml-auto text-[10px] text-gray-600 shrink-0 hidden lg:block">
-        Double-click canvas or <kbd className="bg-gray-800 px-1 rounded">Ctrl+A</kbd> to add task
+      {/* Hint */}
+      <span className="ml-auto text-[10px] text-[var(--color-text-muted)] shrink-0 hidden lg:block">
+        Double-click or <kbd className="bg-[var(--color-surface-overlay)] px-1 rounded text-[9px]">Ctrl+A</kbd>
       </span>
     </header>
   )

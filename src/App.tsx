@@ -6,13 +6,10 @@
  *   │           FilterBar             │  ← top strip
  *   ├──────────────────────┬──────────┤
  *   │                      │          │
- *   │     GraphCanvas      │TaskPanel │  ← TaskPanel only shown when node selected
+ *   │     GraphCanvas      │TaskPanel │  ← TaskPanel always rendered, slides in/out
  *   │     (flex-1)         │ (w-80)   │
  *   │                      │          │
  *   └──────────────────────┴──────────┘
- *
- * ReactFlowProvider must wrap GraphCanvas so that useReactFlow()
- * works inside it (screenToFlowPosition, getViewport, etc.).
  */
 import { ReactFlowProvider } from "@xyflow/react"
 import FilterBar from "./components/FilterBar"
@@ -24,7 +21,7 @@ export default function App() {
   const selectedNodeId = usePMGraphStore((s) => s.selectedNodeId)
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
+    <div className="flex flex-col h-screen bg-surface-base] text-[var(--color-text-primary)]">
       <FilterBar />
       <div className="flex flex-1 min-h-0">
         <ReactFlowProvider>
