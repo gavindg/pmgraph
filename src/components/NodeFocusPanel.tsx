@@ -220,7 +220,7 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 										setLabelInput("")
 									}}
 									suggestions={allLabels.filter((l) => !labels.some((x) => x.text === l.text)).map((l) => l.text)}
-									placeholder="Search or create label…"
+									placeholder="Type label and press enter..."
 									className={`${inputClass} flex-1`}
 								/>
 								{/* Color picker dots */}

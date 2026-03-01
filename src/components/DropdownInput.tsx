@@ -71,11 +71,12 @@ export default function DropdownInput({
   }, [highlightIdx])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Tab cycles through options only when dropdown is already open
-    if (e.key === "Tab" && open && filtered.length > 0) {
-      e.preventDefault()
-      setHighlightIdx((i) => (i + 1) % filtered.length)
-      return
+    // Tab always moves to next/prev field — close dropdown immediately
+    if (e.key === "Tab") {
+      setOpen(false)
+      setHighlightIdx(-1)
+      if (value) setConfirmed(true)
+      return // let default Tab behavior proceed
     }
 
     if (!open || filtered.length === 0) {
@@ -175,6 +176,7 @@ export default function DropdownInput({
             <button
               key={item}
               type="button"
+              tabIndex={-1}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => select(item)}
               className={[
