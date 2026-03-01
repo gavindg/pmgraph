@@ -34,10 +34,10 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
   return (
     <aside
       className={[
-        "w-80 shrink-0 flex flex-col bg-[var(--color-surface-raised)]/95 backdrop-blur-md",
+        "shrink-0 flex flex-col bg-[var(--color-surface-raised)]/95 backdrop-blur-md",
         "border-l border-[var(--color-border-default)] overflow-y-auto overflow-x-hidden",
-        "transform transition-transform duration-200 ease-out",
-        isOpen ? "translate-x-0" : "translate-x-full",
+        "transition-all duration-200 ease-out",
+        isOpen ? "w-80" : "w-0 border-l-0",
       ].join(" ")}
     >
       {!data ? null : (
