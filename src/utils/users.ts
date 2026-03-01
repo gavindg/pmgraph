@@ -1,10 +1,11 @@
 export const DUMMY_USERS = [
-  "Alex Chen",
-  "Sarah Miller",
-  "James Wilson",
-  "Maria Garcia",
-  "David Kim",
-  "Emily Johnson",
-  "Ryan Patel",
-  "Lisa Thompson",
+  "Alex Garcia",
+  "Alex Pham",
+  "Alex Zhuang",
+  "Gavin Gee",
+  "Lucas Zhong",
+  "Karina Chen",
+  "Robert Gellner",
+  "Porter Robinson",
+  "Daniel Salameh"
 ]

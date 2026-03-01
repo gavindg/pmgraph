@@ -39,13 +39,33 @@ function toISODate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 }
 
+function tryParseDate(input: string): string | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+  // Try native Date parsing (handles "Mar 1, 2026", "2026-03-01", "3/1/2026", etc.)
+  const d = new Date(trimmed)
+  if (!isNaN(d.getTime())) {
+    return toISODate(d.getFullYear(), d.getMonth(), d.getDate())
+  }
+  return null
+}
+
 export default function DatePicker({ value, onChange, className }: DatePickerProps) {
   const [open, setOpen] = useState(false)
+  const [inputText, setInputText] = useState(value ? formatDisplay(value) : "")
   const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const selected = toDateParts(value)
   const today = new Date()
   const todayISO = toISODate(today.getFullYear(), today.getMonth(), today.getDate())
+
+  // Sync inputText when value changes externally
+  useEffect(() => {
+    if (!inputRef.current || document.activeElement !== inputRef.current) {
+      setInputText(value ? formatDisplay(value) : "")
+    }
+  }, [value])
 
   // Calendar view month/year — start at selected date or today
   const [viewYear, setViewYear] = useState(selected?.year ?? today.getFullYear())
@@ -126,17 +146,40 @@ export default function DatePicker({ value, onChange, className }: DatePickerPro
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={className || "w-full text-left"}
-      >
-        {value ? (
-          <span className="text-[var(--color-text-primary)]">{formatDisplay(value)}</span>
-        ) : (
-          <span className="text-[var(--color-text-muted)]">No date</span>
-        )}
-      </button>
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputText}
+        placeholder="No date"
+        onClick={() => setOpen(true)}
+        onChange={(e) => {
+          setInputText(e.target.value)
+          const parsed = tryParseDate(e.target.value)
+          if (parsed) {
+            onChange(parsed)
+          }
+        }}
+        onBlur={() => {
+          // Reset display text to match current value
+          setInputText(value ? formatDisplay(value) : "")
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            const parsed = tryParseDate(inputText)
+            if (parsed) {
+              onChange(parsed)
+              setOpen(false)
+            }
+            inputRef.current?.blur()
+          }
+          if (e.key === "Escape") {
+            setInputText(value ? formatDisplay(value) : "")
+            setOpen(false)
+            inputRef.current?.blur()
+          }
+        }}
+        className={className || "w-full text-left bg-transparent outline-none text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"}
+      />
 
       {open && (
         <div className="absolute z-50 left-0 bottom-full mb-1 w-64 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] rounded-xl shadow-2xl p-3 flex flex-col gap-2">
