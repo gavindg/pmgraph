@@ -48,7 +48,7 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
   return (
     <div
       className={[
-        "min-w-44 max-w-60",
+        "node-drag-handle min-w-44 max-w-60 cursor-grab active:cursor-grabbing",
         "border border-white/[0.06] rounded-xl",
         "transition-all duration-150 ease-out",
         dragging
@@ -59,7 +59,7 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
       style={selected ? { "--tw-ring-color": categoryColor + "55" } as React.CSSProperties : {}}
     >
       {/* ── Header ───────────────────────────────────────── */}
-      <div className="node-drag-handle px-3 pt-2.5 pb-2 bg-[var(--color-surface-raised)] rounded-t-xl cursor-grab active:cursor-grabbing">
+      <div className="px-3 pt-2.5 pb-2 bg-[var(--color-surface-raised)] rounded-t-xl">
         <div className="text-sm font-semibold text-white leading-snug break-words">
           {(data.title as string) || "Untitled"}
         </div>
@@ -78,8 +78,8 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
           type="target"
           position={Position.Left}
           id="in"
-          isConnectableStart={false}
-          className="w-2.5! h-2.5! rounded-full! bg-white/25! border-0! left-0! top-1/2! -translate-y-1/2!"
+          // isConnectableStart={false}
+          className="w-3! h-3! rounded-full! bg-white/25! border-0! left-0! top-1/2! -translate-y-1/2!"
         />
 
         {/* Labels */}
@@ -135,7 +135,7 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
           type="source"
           position={Position.Right}
           id="out"
-          className="w-2.5! h-2.5! rounded-full! bg-white/25! border-0! right-0! top-1/2! -translate-y-1/2!"
+          className="w-3! h-3! rounded-full! bg-white/25! border-0! right-0! top-1/2! -translate-y-1/2!"
         />
       </div>
     </div>
