@@ -15,6 +15,8 @@ interface DropdownInputProps {
   onSelect?: (v: string) => void
   onCommit?: (v: string) => void
   suggestions: string[]
+  /** Optional map of suggestion → hex color to show a colored dot */
+  colors?: Record<string, string>
   placeholder?: string
   className?: string
 }
@@ -25,17 +27,19 @@ export default function DropdownInput({
   onSelect,
   onCommit,
   suggestions,
+  colors,
   placeholder,
   className,
 }: DropdownInputProps) {
   const [open, setOpen] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState(-1)
+  const [isEditing, setIsEditing] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Filter suggestions by input value
+  // Only filter when the user is actively typing; otherwise show all
   const filtered = (() => {
-    if (!value) return suggestions
+    if (!isEditing || !value) return suggestions
     const q = value.toLowerCase()
     return suggestions.filter((s) => s.toLowerCase().includes(q))
   })()
@@ -49,6 +53,7 @@ export default function DropdownInput({
       }
       setOpen(false)
       setHighlightIdx(-1)
+      setIsEditing(false)
     },
     [onChange, onSelect]
   )
@@ -68,6 +73,11 @@ export default function DropdownInput({
         setOpen(true)
         setHighlightIdx(0)
         e.preventDefault()
+        return
+      }
+      // Tab with no dropdown → select first match only if user was typing
+      if (e.key === "Tab" && isEditing && value && filtered.length > 0) {
+        select(filtered[0])
         return
       }
       // Enter with no dropdown → commit raw value
@@ -98,9 +108,14 @@ export default function DropdownInput({
         break
       case "Tab":
         if (highlightIdx >= 0 && highlightIdx < filtered.length) {
-          e.preventDefault()
           select(filtered[highlightIdx])
+        } else if (isEditing && filtered.length > 0 && value) {
+          // Tab with typed text but no highlight → select first match
+          select(filtered[0])
         }
+        // Don't preventDefault — let browser move focus to next field
+        setOpen(false)
+        setHighlightIdx(-1)
         break
       case "Escape":
         e.preventDefault()
@@ -110,25 +125,38 @@ export default function DropdownInput({
     }
   }
 
+  const selectedColor = value && colors?.[value] ? colors[value] : null
+
   return (
     <div className="relative">
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value)
-          setOpen(true)
-          setHighlightIdx(-1)
-        }}
-        onFocus={() => {
-          setOpen(true)
-          setHighlightIdx(-1)
-        }}
-        onBlur={() => setTimeout(() => { setOpen(false); setHighlightIdx(-1) }, 150)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className={className}
-      />
+      <div className="relative flex items-center">
+        {selectedColor && (
+          <span
+            className="absolute left-2.5 w-2 h-2 rounded-full shrink-0 pointer-events-none z-10"
+            style={{ backgroundColor: selectedColor }}
+          />
+        )}
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value)
+            setIsEditing(true)
+            setOpen(true)
+            setHighlightIdx(-1)
+          }}
+          onFocus={() => {
+            setIsEditing(false)
+            setOpen(true)
+            setHighlightIdx(-1)
+          }}
+          onBlur={() => setTimeout(() => { setOpen(false); setHighlightIdx(-1); setIsEditing(false) }, 150)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className={className}
+          style={selectedColor ? { paddingLeft: "1.75rem" } : undefined}
+        />
+      </div>
       {open && filtered.length > 0 && (
         <div
           ref={listRef}
@@ -141,12 +169,15 @@ export default function DropdownInput({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => select(item)}
               className={[
-                "w-full text-left px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] transition-colors",
+                "w-full text-left px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] transition-colors flex items-center gap-2",
                 i === highlightIdx
                   ? "bg-[var(--color-surface-raised)]"
                   : "hover:bg-[var(--color-surface-raised)]",
               ].join(" ")}
             >
+              {colors?.[item] && (
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[item] }} />
+              )}
               {item}
             </button>
           ))}

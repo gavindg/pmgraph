@@ -29,6 +29,7 @@ export type Filters = {
   departments: Department[]
   priority: Priority | ""
   statuses: Status[]
+  labels: string[]
   assignee: string
   search: string
 }

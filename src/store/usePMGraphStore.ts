@@ -104,6 +104,7 @@ const defaultFilters: Filters = {
   departments: [],
   priority: "",
   statuses: [],
+  labels: [],
   assignee: "",
   search: "",
 }
@@ -456,9 +457,9 @@ export function getActivePreset(state: PMGraphState): Preset {
 }
 
 export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string> {
-  const { departments, priority, statuses, assignee, search } = filters
+  const { departments, priority, statuses, labels, assignee, search } = filters
   const noFilters =
-    departments.length === 0 && priority === "" && statuses.length === 0 && assignee === "" && search === ""
+    departments.length === 0 && priority === "" && statuses.length === 0 && labels.length === 0 && assignee === "" && search === ""
 
   if (noFilters) return new Set(nodes.map((n) => n.id))
 
@@ -476,6 +477,8 @@ export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string>
     const matchPriority = priority === "" || d.priority === (priority as Priority)
     const matchStatus =
       statuses.length === 0 || statuses.includes(d.status as Status)
+    const matchLabels =
+      labels.length === 0 || labels.some((l) => (d.labels ?? []).some((nl) => nl.text === l))
     const matchAssignee =
       assignee === "" ||
       (d.assignee as string).toLowerCase().includes(assignee.toLowerCase())
@@ -484,7 +487,7 @@ export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string>
       (d.title as string).toLowerCase().includes(searchLower) ||
       (d.assignee as string).toLowerCase().includes(searchLower)
 
-    if (matchDept && matchPriority && matchStatus && matchAssignee && matchSearch) {
+    if (matchDept && matchPriority && matchStatus && matchLabels && matchAssignee && matchSearch) {
       visible.add(node.id)
     }
   }

@@ -8,18 +8,6 @@ export const DEFAULT_STATUSES: StatusDefinition[] = [
 
 export const PRESETS: Preset[] = [
 	{
-		id: "gamedev",
-		label: "Game Dev",
-		categories: [
-			{ name: "Programming", color: "#673ab7" },
-			{ name: "Art", color: "#FF2800" },
-			{ name: "Design", color: "#6795ED" },
-			{ name: "Audio", color: "#F67E18" },
-			{ name: "QA", color: "#22c67e" },
-		],
-		statuses: DEFAULT_STATUSES,
-	},
-	{
 		id: "startup",
 		label: "Startup / Product",
 		categories: [
@@ -28,6 +16,18 @@ export const PRESETS: Preset[] = [
 			{ name: "Design", color: "#ec4899" },
 			{ name: "Marketing", color: "#f97316" },
 			{ name: "Ops", color: "#22c55e" },
+		],
+		statuses: DEFAULT_STATUSES,
+	},
+	{
+		id: "gamedev",
+		label: "Game Dev",
+		categories: [
+			{ name: "Programming", color: "#673ab7" },
+			{ name: "Art", color: "#FF2800" },
+			{ name: "Design", color: "#6795ED" },
+			{ name: "Audio", color: "#F67E18" },
+			{ name: "QA", color: "#22c67e" },
 		],
 		statuses: DEFAULT_STATUSES,
 	},

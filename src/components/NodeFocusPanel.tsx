@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useRef, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS, LABEL_COLORS, getStatusBg } from "../utils/colors"
+import { LABEL_COLORS, PRIORITY_COLORS } from "../utils/colors"
 import { DUMMY_USERS } from "../utils/users"
 import DropdownInput from "./DropdownInput"
 import DatePicker from "./DatePicker"
@@ -128,74 +128,56 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 
 						<hr className="border-[var(--color-border-subtle)]" />
 
-						{/* Department chips */}
+						{/* Department dropdown */}
 						<Field label="Department">
-							<div className="flex flex-wrap gap-1.5">
-								<ChipButton active={department === ""} onClick={() => setDepartment("")}>
-									None
-								</ChipButton>
-								{preset.categories.map((cat) => (
-									<ChipButton
-										key={cat.name}
-										active={department === cat.name}
-										color={cat.color}
-										onClick={() => setDepartment(cat.name)}
-									>
-										{cat.name}
-									</ChipButton>
-								))}
-							</div>
+							<DropdownInput
+								value={department}
+								onChange={setDepartment}
+								onSelect={setDepartment}
+								suggestions={preset.categories.map((c) => c.name)}
+								colors={Object.fromEntries(preset.categories.map((c) => [c.name, c.color]))}
+								placeholder="Select department…"
+								className={inputClass}
+							/>
 						</Field>
 
-            {/* Status */}
-            <Field label="Status">
-              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
-                {preset.statuses.map((s) => {
-                  const active = status === s.id
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setStatus(s.id)}
-                      className={[
-                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
-                        active
-                          ? "text-white"
-                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                      ].join(" ")}
-                      style={active ? { backgroundColor: getStatusBg(preset.statuses, s.id) } : {}}
-                    >
-                      {s.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </Field>
+						{/* Status dropdown */}
+						<Field label="Status">
+							<DropdownInput
+								value={preset.statuses.find((s) => s.id === status)?.label ?? status}
+								onChange={(v) => {
+									const match = preset.statuses.find((s) => s.label.toLowerCase() === v.toLowerCase())
+									if (match) setStatus(match.id)
+								}}
+								onSelect={(v) => {
+									const match = preset.statuses.find((s) => s.label === v)
+									if (match) setStatus(match.id)
+								}}
+								suggestions={preset.statuses.map((s) => s.label)}
+								colors={Object.fromEntries(preset.statuses.map((s) => [s.label, s.color]))}
+								placeholder="Select status…"
+								className={inputClass}
+							/>
+						</Field>
 
-            {/* Priority */}
-            <Field label="Priority">
-              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
-                {PRIORITIES.map((p) => {
-                  const active = priority === p
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPriority(p)}
-                      className={[
-                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
-                        active
-                          ? "text-white"
-                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                      ].join(" ")}
-                      style={active ? { backgroundColor: PRIORITY_COLORS[p].bg } : {}}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  )
-                })}
-              </div>
-            </Field>
+						{/* Priority dropdown */}
+						<Field label="Priority">
+							<DropdownInput
+								value={priority.charAt(0).toUpperCase() + priority.slice(1)}
+								onChange={(v) => {
+									const match = PRIORITIES.find((p) => p.toLowerCase() === v.toLowerCase())
+									if (match) setPriority(match)
+								}}
+								onSelect={(v) => {
+									const match = PRIORITIES.find((p) => p === v.toLowerCase())
+									if (match) setPriority(match)
+								}}
+								suggestions={PRIORITIES.map((p) => p.charAt(0).toUpperCase() + p.slice(1))}
+								colors={{ Low: PRIORITY_COLORS.low.dot, Medium: PRIORITY_COLORS.medium.dot, High: PRIORITY_COLORS.high.dot }}
+								placeholder="Select priority…"
+								className={inputClass}
+							/>
+						</Field>
 
 						<div className="grid grid-cols-2 gap-3">
 							<Field label="Assignee">
@@ -319,36 +301,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 			</label>
 			{children}
 		</div>
-	)
-}
-
-function ChipButton({
-	active,
-	color,
-	onClick,
-	children,
-}: {
-	active: boolean
-	color?: string
-	onClick: () => void
-	children: React.ReactNode
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className={[
-				"text-xs px-2.5 py-1 rounded-full border transition-colors duration-150",
-				active
-					? color
-						? "text-white border-transparent"
-						: "bg-[var(--color-surface-overlay)] text-[var(--color-text-primary)] border-[var(--color-border-default)]"
-					: "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-			].join(" ")}
-			style={active && color ? { backgroundColor: color } : {}}
-		>
-			{children}
-		</button>
 	)
 }
 

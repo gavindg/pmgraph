@@ -14,7 +14,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
 import { getPresetById } from "../utils/presets"
-import { PRIORITY_COLORS, LABEL_COLORS, getStatusBg } from "../utils/colors"
+import { LABEL_COLORS, PRIORITY_COLORS } from "../utils/colors"
+import DropdownInput from "./DropdownInput"
 import DatePicker from "./DatePicker"
 import type { Priority, TaskNodeData, LabelItem } from "../types"
 
@@ -137,75 +138,61 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
             {/* ── Classification ────────────────────────────────── */}
             <SectionHeader>Classification</SectionHeader>
 
-            {/* Status — chips with add/remove */}
+            {/* Status — dropdown + add/remove */}
             <Field label="Status">
+              <DropdownInput
+                value={preset.statuses.find((s) => s.id === (data.status as string))?.label ?? (data.status as string)}
+                onChange={(v) => {
+                  const match = preset.statuses.find((s) => s.label.toLowerCase() === v.toLowerCase())
+                  if (match) update({ status: match.id })
+                }}
+                onSelect={(v) => {
+                  const match = preset.statuses.find((s) => s.label === v)
+                  if (match) update({ status: match.id })
+                }}
+                suggestions={preset.statuses.map((s) => s.label)}
+                colors={Object.fromEntries(preset.statuses.map((s) => [s.label, s.color]))}
+                placeholder="Select status…"
+                className={inputClass}
+              />
               <StatusControl
                 statuses={preset.statuses}
-                activeStatus={data.status as string}
                 baseStatusIds={baseStatusIds}
-                onSelect={(id) => update({ status: id })}
                 onAdd={addStatus}
                 onRemove={removeStatus}
               />
             </Field>
 
-            {/* Priority — segmented control */}
+            {/* Priority — dropdown */}
             <Field label="Priority">
-              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
-                {PRIORITIES.map((p) => {
-                  const active = data.priority === p
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => update({ priority: p })}
-                      className={[
-                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
-                        active
-                          ? "text-white"
-                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                      ].join(" ")}
-                      style={active ? { backgroundColor: PRIORITY_COLORS[p].bg } : {}}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  )
-                })}
-              </div>
+              <DropdownInput
+                value={(data.priority as string).charAt(0).toUpperCase() + (data.priority as string).slice(1)}
+                onChange={(v) => {
+                  const match = PRIORITIES.find((p) => p.toLowerCase() === v.toLowerCase())
+                  if (match) update({ priority: match })
+                }}
+                onSelect={(v) => {
+                  const match = PRIORITIES.find((p) => p === v.toLowerCase())
+                  if (match) update({ priority: match })
+                }}
+                suggestions={PRIORITIES.map((p) => p.charAt(0).toUpperCase() + p.slice(1))}
+                colors={{ Low: PRIORITY_COLORS.low.dot, Medium: PRIORITY_COLORS.medium.dot, High: PRIORITY_COLORS.high.dot }}
+                placeholder="Select priority…"
+                className={inputClass}
+              />
             </Field>
 
-            {/* Department — color chips */}
+            {/* Department — dropdown with colors */}
             <Field label="Department">
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => update({ department: "" })}
-                  className={[
-                    "text-xs px-2.5 py-1 rounded-full border transition-colors duration-150",
-                    data.department === ""
-                      ? "bg-[var(--color-surface-overlay)] text-[var(--color-text-primary)] border-[var(--color-border-default)]"
-                      : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                  ].join(" ")}
-                >
-                  None
-                </button>
-                {preset.categories.map((cat) => {
-                  const active = data.department === cat.name
-                  return (
-                    <button
-                      key={cat.name}
-                      onClick={() => update({ department: cat.name })}
-                      className={[
-                        "text-xs px-2.5 py-1 rounded-full border transition-colors duration-150",
-                        active
-                          ? "text-white border-transparent"
-                          : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                      ].join(" ")}
-                      style={active ? { backgroundColor: cat.color } : {}}
-                    >
-                      {cat.name}
-                    </button>
-                  )
-                })}
-              </div>
+              <DropdownInput
+                value={data.department as string}
+                onChange={(v) => update({ department: v })}
+                onSelect={(v) => update({ department: v })}
+                suggestions={preset.categories.map((c) => c.name)}
+                colors={Object.fromEntries(preset.categories.map((c) => [c.name, c.color]))}
+                placeholder="Select department…"
+                className={inputClass}
+              />
             </Field>
 
             <hr className="border-[var(--color-border-subtle)]" />
@@ -397,16 +384,12 @@ function LabelEditor({
 
 function StatusControl({
   statuses,
-  activeStatus,
   baseStatusIds,
-  onSelect,
   onAdd,
   onRemove,
 }: {
   statuses: { id: string; label: string; color: string }[]
-  activeStatus: string
   baseStatusIds: Set<string>
-  onSelect: (id: string) => void
   onAdd: (status: { id: string; label: string; color: string }) => void
   onRemove: (id: string) => void
 }) {
@@ -429,43 +412,32 @@ function StatusControl({
     setAdding(false)
   }
 
+  const customStatuses = statuses.filter((s) => !baseStatusIds.has(s.id))
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-1.5">
-        {statuses.map((s) => {
-          const active = activeStatus === s.id
-          const isCustom = !baseStatusIds.has(s.id)
-          return (
-            <div key={s.id} className="relative group">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {customStatuses.map((s) => (
+          <div key={s.id} className="relative group">
+            <span
+              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)]"
+            >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+              {s.label}
               <button
-                onClick={() => onSelect(s.id)}
-                className={[
-                  "text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors duration-150",
-                  active
-                    ? "text-white"
-                    : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                ].join(" ")}
-                style={active ? { backgroundColor: getStatusBg(statuses, s.id) } : {}}
+                onClick={() => onRemove(s.id)}
+                className="text-[var(--color-text-muted)] hover:text-red-400 transition-colors text-[10px] leading-none ml-0.5"
               >
-                {s.label}
+                ×
               </button>
-              {isCustom && !active && (
-                <button
-                  onClick={() => onRemove(s.id)}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900/80 text-red-300 text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove status"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )
-        })}
+            </span>
+          </div>
+        ))}
         <button
           onClick={() => setAdding(true)}
           className="text-xs px-2 py-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors"
         >
-          +
+          + Add Status
         </button>
       </div>
       {adding && (
