@@ -36,6 +36,7 @@ import TaskNode from "./TaskNode"
 import GroupNode from "./GroupNode"
 import TypedEdge, { EdgeArrowDefs } from "./TypedEdge"
 import NodeFocusPanel from "./NodeFocusPanel"
+import CommandBar from "./CommandBar"
 import { usePMGraphStore, getActivePreset, getFilteredNodeIds } from "../store/usePMGraphStore"
 import { getCategoryColor } from "../utils/colors"
 import type { TaskNodeData, PMEdgeData, EdgeType } from "../types"
@@ -77,8 +78,11 @@ export default function GraphCanvas() {
   const redo = usePMGraphStore((s) => s.redo)
   const preset = usePMGraphStore((s) => getActivePreset(s))
 
-  const { screenToFlowPosition } = useReactFlow()
+  const setNodePosition = usePMGraphStore((s) => s.setNodePosition)
+
+  const { screenToFlowPosition, getNodes } = useReactFlow()
   const [focusPanel, setFocusPanel] = useState<FocusPanelState | null>(null)
+  const [commandBarOpen, setCommandBarOpen] = useState(false)
 
   // connectingRef: tracks the source node/handle for wire-to-create
   // connectionMadeRef: set true when onConnect fires (real connection), so
@@ -265,11 +269,20 @@ export default function GraphCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K works from anywhere (including inputs)
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault()
+        setCommandBarOpen((prev) => !prev)
+        return
+      }
+
       const tag = (e.target as HTMLElement).tagName
       const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 
       if (e.key === "Escape") {
-        if (focusPanel) {
+        if (commandBarOpen) {
+          setCommandBarOpen(false)
+        } else if (focusPanel) {
           setFocusPanel(null)
         } else if (taskPanelOpen) {
           setTaskPanelOpen(false)
@@ -325,7 +338,7 @@ export default function GraphCanvas() {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [
-    focusPanel, taskPanelOpen, selectedNodeId,
+    focusPanel, taskPanelOpen, selectedNodeId, commandBarOpen,
     screenToFlowPosition, setSelectedNode, setTaskPanelOpen,
     deleteNode, addNode, addGroupNode, undo, redo,
   ])
@@ -370,6 +383,40 @@ export default function GraphCanvas() {
     [removeEdge]
   )
 
+  // ── Overlap prevention on drag stop ────────────────────────────────
+  const onNodeDragStop: NodeMouseHandler = useCallback(
+    (_event, draggedNode) => {
+      const allNodes = getNodes()
+      const dw = draggedNode.measured?.width ?? 180
+      const dh = draggedNode.measured?.height ?? 80
+
+      for (const other of allNodes) {
+        if (other.id === draggedNode.id || other.type === "group") continue
+        if (other.parentId !== draggedNode.parentId) continue
+
+        const ow = other.measured?.width ?? 180
+        const oh = other.measured?.height ?? 80
+
+        const overlapX =
+          draggedNode.position.x < other.position.x + ow &&
+          draggedNode.position.x + dw > other.position.x
+        const overlapY =
+          draggedNode.position.y < other.position.y + oh &&
+          draggedNode.position.y + dh > other.position.y
+
+        if (overlapX && overlapY) {
+          // Nudge the dragged node to the right of the overlapped node
+          setNodePosition(draggedNode.id, {
+            x: other.position.x + ow + 20,
+            y: draggedNode.position.y,
+          })
+          break
+        }
+      }
+    },
+    [getNodes, setNodePosition]
+  )
+
   // ── MiniMap node color ─────────────────────────────────────────────
   const minimapNodeColor = useCallback(
     (n: Node) => {
@@ -395,6 +442,7 @@ export default function GraphCanvas() {
         onConnectEnd={onConnectEnd}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
         onEdgeClick={onEdgeClick}
         onEdgeDoubleClick={onEdgeDoubleClick}
@@ -446,6 +494,21 @@ export default function GraphCanvas() {
           nodeId={focusPanel.nodeId}
           onSubmit={handleFocusPanelSubmit}
           onClose={handleFocusPanelClose}
+        />
+      )}
+
+      {/* Command Bar (Ctrl+K) */}
+      {commandBarOpen && (
+        <CommandBar
+          onClose={() => setCommandBarOpen(false)}
+          onCreateTask={() => {
+            setCommandBarOpen(false)
+            const el = document.querySelector(".react-flow__pane") as HTMLElement
+            if (!el) return
+            const rect = el.getBoundingClientRect()
+            const flowPos = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+            setFocusPanel({ mode: "create", flowPos })
+          }}
         />
       )}
     </div>

@@ -13,6 +13,7 @@ export function createDefaultNode(
     id: generateId(),
     type: "task",
     position,
+    dragHandle: ".node-drag-handle",
     data: {
       title: "Untitled",
       description: "",
@@ -35,6 +36,7 @@ export function createGroupNode(
     id: generateId(),
     type: "group",
     position,
+    dragHandle: ".node-drag-handle",
     style: { width: 400, height: 300 },
     data: {
       title,

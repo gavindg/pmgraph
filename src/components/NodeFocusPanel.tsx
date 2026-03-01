@@ -6,9 +6,10 @@
  *
  * Keyboard: Escape = close, Ctrl+Enter = submit.
  */
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
 import { PRIORITY_COLORS, LABEL_COLORS } from "../utils/colors"
+import { DUMMY_USERS } from "../utils/users"
 import type { TaskNodeData, Priority, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
@@ -165,12 +166,7 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Assignee">
-                <input
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  placeholder="Who owns this?"
-                  className={inputClass}
-                />
+                <AssigneeInput value={assignee} onChange={setAssignee} />
               </Field>
               <Field label="Due Date">
                 <input
@@ -305,6 +301,43 @@ function ChipButton({
     >
       {children}
     </button>
+  )
+}
+
+function AssigneeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [focused, setFocused] = useState(false)
+  const suggestions = useMemo(() => {
+    if (!value) return DUMMY_USERS
+    const q = value.toLowerCase()
+    return DUMMY_USERS.filter((u) => u.toLowerCase().includes(q))
+  }, [value])
+
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        placeholder="Who owns this?"
+        className={inputClass}
+      />
+      {focused && suggestions.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)] rounded-md shadow-lg max-h-36 overflow-y-auto">
+          {suggestions.map((u) => (
+            <button
+              key={u}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onChange(u); setFocused(false) }}
+              className="w-full text-left px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)] transition-colors"
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

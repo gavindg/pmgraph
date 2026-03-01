@@ -51,7 +51,7 @@ function GroupNode({ id, data, selected }: NodeProps<Node<GroupNodeData>>) {
     >
       {/* Header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+        className="node-drag-handle flex items-center gap-2 px-3 py-2 cursor-grab active:cursor-grabbing"
         style={{ borderBottom: collapsed ? "none" : `2px solid ${color}40` }}
         onClick={() => toggleCollapse(id)}
       >

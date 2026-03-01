@@ -56,6 +56,7 @@ interface PMGraphState {
   addNode: (position: { x: number; y: number }, data?: Partial<TaskNodeData>) => string
   updateNode: (id: string, data: Partial<TaskNodeData>) => void
   deleteNode: (id: string) => void
+  setNodePosition: (id: string, position: { x: number; y: number }) => void
   setSelectedNode: (id: string | null) => void
 
   // ── Group actions ─────────────────────────────────────────────────
@@ -136,6 +137,12 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
       edges: s.edges.filter((e) => e.source !== id && e.target !== id),
       selectedNodeId: s.selectedNodeId === id ? null : s.selectedNodeId,
       taskPanelOpen: s.selectedNodeId === id ? false : s.taskPanelOpen,
+    }))
+  },
+
+  setNodePosition: (id, position) => {
+    set((s) => ({
+      nodes: s.nodes.map((n) => (n.id === id ? { ...n, position } : n)),
     }))
   },
 

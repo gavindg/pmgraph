@@ -58,7 +58,7 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
       style={selected ? { "--tw-ring-color": categoryColor + "55" } as React.CSSProperties : {}}
     >
       {/* ── Header ───────────────────────────────────────── */}
-      <div className="px-3 pt-2.5 pb-2 bg-[var(--color-surface-raised)] rounded-t-xl">
+      <div className="node-drag-handle px-3 pt-2.5 pb-2 bg-[var(--color-surface-raised)] rounded-t-xl cursor-grab active:cursor-grabbing">
         <div className="text-sm font-semibold text-white leading-snug break-words">
           {(data.title as string) || "Untitled"}
         </div>
