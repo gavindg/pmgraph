@@ -1,37 +1,39 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+/**
+ * App — Root layout component.
+ *
+ * Layout:
+ *   ┌─────────────────────────────────┐
+ *   │           FilterBar             │  ← top strip
+ *   ├──────────────────────┬──────────┤
+ *   │                      │          │
+ *   │     GraphCanvas      │TaskPanel │  ← TaskPanel only shown when node selected
+ *   │     (flex-1)         │ (w-80)   │
+ *   │                      │          │
+ *   └──────────────────────┴──────────┘
+ *
+ * ReactFlowProvider must wrap GraphCanvas so that useReactFlow()
+ * works inside it (screenToFlowPosition, getViewport, etc.).
+ */
+import { ReactFlowProvider } from "@xyflow/react"
+import FilterBar from "./components/FilterBar"
+import GraphCanvas from "./components/GraphCanvas"
+import TaskPanel from "./components/TaskPanel"
+import { usePMGraphStore } from "./store/usePMGraphStore"
 
-function App() {
-	const [count, setCount] = useState(0)
+export default function App() {
+  const selectedNodeId = usePMGraphStore((s) => s.selectedNodeId)
 
-	return (
-		<>
-			<div>
-				<a href="https://vite.dev" target="_blank">
-					<img src={viteLogo} className="logo" alt="Vite logo" />
-				</a>
-				<a href="https://react.dev" target="_blank">
-					<img src={reactLogo} className="logo react" alt="React logo" />
-				</a>
-			</div>
-			<h1>Vite + React</h1>
-
-			<p className="text-3xl font-bold underline">hi whats up</p>
-			<div className="card">
-				<button onClick={() => setCount((count) => count + 1)}>
-					count is {count}
-				</button>
-				<p>
-					Edit <code>src/App.tsx</code> and save to test HMR
-				</p>
-			</div>
-			<p className="read-the-docs">
-				Click on the Vite and React logos to learn more
-			</p>
-		</>
-	)
+  return (
+    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
+      <FilterBar />
+      <div className="flex flex-1 min-h-0">
+        <ReactFlowProvider>
+          <div className="flex-1 min-w-0">
+            <GraphCanvas />
+          </div>
+        </ReactFlowProvider>
+        {selectedNodeId !== null && <TaskPanel />}
+      </div>
+    </div>
+  )
 }
-
-export default App;
