@@ -4,6 +4,7 @@
  * Manages nodes, edges, selection, filters, presets, group state, and undo/redo history.
  */
 import { create } from "zustand"
+import { persist } from "zustand/middleware"
 import {
   applyNodeChanges,
   applyEdgeChanges,
@@ -109,7 +110,7 @@ const defaultFilters: Filters = {
   search: "",
 }
 
-export const usePMGraphStore = create<PMGraphState>((set) => ({
+export const usePMGraphStore = create<PMGraphState>()(persist((set) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -428,6 +429,38 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
 
   onEdgesChange: (changes) => {
     set((s) => ({ edges: applyEdgeChanges(changes, s.edges) }))
+  },
+}), {
+  name: "pmgraph-store",
+  partialize: (state) => ({
+    nodes: state.nodes,
+    edges: state.edges,
+    activePresetId: state.activePresetId,
+    collapsedGroups: state.collapsedGroups,
+    customStatuses: state.customStatuses,
+  }),
+  storage: {
+    getItem: (name: string) => {
+      const str = localStorage.getItem(name)
+      if (!str) return null
+      const parsed = JSON.parse(str)
+      if (parsed.state?.collapsedGroups) {
+        parsed.state.collapsedGroups = new Set(parsed.state.collapsedGroups)
+      }
+      return parsed
+    },
+    setItem: (name: string, value: unknown) => {
+      const v = value as { state: Record<string, unknown>; version: number }
+      const serialized = {
+        ...v,
+        state: {
+          ...v.state,
+          collapsedGroups: [...((v.state.collapsedGroups as Set<string>) ?? [])],
+        },
+      }
+      localStorage.setItem(name, JSON.stringify(serialized))
+    },
+    removeItem: (name: string) => localStorage.removeItem(name),
   },
 }))
 
