@@ -3,9 +3,9 @@
 /* ── Design Tokens ────────────────────────────────────────────────── */
 @theme {
   /* Surface */
-  --color-surface-base: #030712;
-  --color-surface-raised: #111827;
-  --color-surface-overlay: #1f2937;
+  --color-surface-base: #080808;
+  --color-surface-raised: #282828;
+  --color-surface-overlay: #181818;
 
   /* Border */
   --color-border-default: #374151;
