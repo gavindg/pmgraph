@@ -1,4 +1,5 @@
 export type Priority = "low" | "medium" | "high"
+export type Status = "todo" | "in-progress" | "done"
 
 // Department is now a dynamic string (driven by the active preset's categories).
 // Empty string means uncategorized.
@@ -14,6 +15,7 @@ export type TaskNodeData = {
   description: string
   priority: Priority
   department: Department
+  status: Status
   labels: LabelItem[]
   assignee: string
   dueDate: string | null
@@ -24,6 +26,7 @@ export type TaskNodeData = {
 export type Filters = {
   departments: Department[]
   priority: Priority | ""
+  statuses: Status[]
   assignee: string
   search: string
 }

@@ -19,6 +19,7 @@ import type {
   TaskNodeData,
   Filters,
   Priority,
+  Status,
   Preset,
   EdgeType,
   PMEdgeData,
@@ -46,6 +47,7 @@ interface PMGraphState {
   collapsedGroups: Set<string>
 
   // ── UI state ──────────────────────────────────────────────────────
+  activeView: "graph" | "kanban"
   taskPanelOpen: boolean
 
   // ── Undo/redo ─────────────────────────────────────────────────────
@@ -77,7 +79,11 @@ interface PMGraphState {
   // ── Preset actions ────────────────────────────────────────────────
   setPreset: (presetId: string) => void
 
+  // ── Node status ──────────────────────────────────────────────────
+  setNodeStatus: (id: string, status: Status) => void
+
   // ── UI actions ────────────────────────────────────────────────────
+  setActiveView: (view: "graph" | "kanban") => void
   setTaskPanelOpen: (open: boolean) => void
 
   // ── History actions ───────────────────────────────────────────────
@@ -92,6 +98,7 @@ interface PMGraphState {
 const defaultFilters: Filters = {
   departments: [],
   priority: "",
+  statuses: [],
   assignee: "",
   search: "",
 }
@@ -103,6 +110,7 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
   filters: defaultFilters,
   activePresetId: "gamedev",
   collapsedGroups: new Set<string>(),
+  activeView: "graph",
   taskPanelOpen: false,
   _past: [],
   _future: [],
@@ -308,7 +316,23 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
     }))
   },
 
+  // ── Node status ──────────────────────────────────────────────────
+
+  setNodeStatus: (id, status) => {
+    set((s) => ({
+      _past: pushHistory(s._past, { nodes: s.nodes, edges: s.edges }),
+      _future: [],
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, status } } : n
+      ),
+    }))
+  },
+
   // ── UI actions ────────────────────────────────────────────────────
+
+  setActiveView: (view) => {
+    set({ activeView: view })
+  },
 
   setTaskPanelOpen: (open) => {
     set({ taskPanelOpen: open })
@@ -373,9 +397,9 @@ export function getActivePreset(state: PMGraphState): Preset {
 }
 
 export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string> {
-  const { departments, priority, assignee, search } = filters
+  const { departments, priority, statuses, assignee, search } = filters
   const noFilters =
-    departments.length === 0 && priority === "" && assignee === "" && search === ""
+    departments.length === 0 && priority === "" && statuses.length === 0 && assignee === "" && search === ""
 
   if (noFilters) return new Set(nodes.map((n) => n.id))
 
@@ -391,6 +415,8 @@ export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string>
     const matchDept =
       departments.length === 0 || departments.includes(d.department as string)
     const matchPriority = priority === "" || d.priority === (priority as Priority)
+    const matchStatus =
+      statuses.length === 0 || statuses.includes(d.status as Status)
     const matchAssignee =
       assignee === "" ||
       (d.assignee as string).toLowerCase().includes(assignee.toLowerCase())
@@ -399,7 +425,7 @@ export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string>
       (d.title as string).toLowerCase().includes(searchLower) ||
       (d.assignee as string).toLowerCase().includes(searchLower)
 
-    if (matchDept && matchPriority && matchAssignee && matchSearch) {
+    if (matchDept && matchPriority && matchStatus && matchAssignee && matchSearch) {
       visible.add(node.id)
     }
   }

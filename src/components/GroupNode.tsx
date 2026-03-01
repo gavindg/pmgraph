@@ -83,13 +83,14 @@ function GroupNode({ id, data, selected }: NodeProps<Node<GroupNodeData>>) {
         type="target"
         position={Position.Left}
         id="group-in"
-        className="w-2! h-2! rounded-full! bg-white/30! border-0! left-0! top-1/2! -translate-y-1/2!"
+        isConnectableStart={false}
+        className="w-2.5! h-2.5! rounded-full! bg-white/30! border-0! left-0! top-1/2! -translate-y-1/2!"
       />
       <Handle
         type="source"
         position={Position.Right}
         id="group-out"
-        className="w-2! h-2! rounded-full! bg-white/30! border-0! right-0! top-1/2! -translate-y-1/2!"
+        className="w-2.5! h-2.5! rounded-full! bg-white/30! border-0! right-0! top-1/2! -translate-y-1/2!"
       />
     </div>
   )

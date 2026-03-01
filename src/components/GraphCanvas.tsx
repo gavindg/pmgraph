@@ -36,7 +36,6 @@ import TaskNode from "./TaskNode"
 import GroupNode from "./GroupNode"
 import TypedEdge, { EdgeArrowDefs } from "./TypedEdge"
 import NodeFocusPanel from "./NodeFocusPanel"
-import CommandBar from "./CommandBar"
 import { usePMGraphStore, getActivePreset, getFilteredNodeIds } from "../store/usePMGraphStore"
 import { getCategoryColor } from "../utils/colors"
 import type { TaskNodeData, PMEdgeData, EdgeType } from "../types"
@@ -56,7 +55,12 @@ interface FocusPanelState {
   pendingConnection?: { source: string; sourceHandle: string | null }
 }
 
-export default function GraphCanvas() {
+interface GraphCanvasProps {
+  pendingCreate?: boolean
+  onPendingCreateHandled?: () => void
+}
+
+export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: GraphCanvasProps = {}) {
   const nodes = usePMGraphStore((s) => s.nodes)
   const edges = usePMGraphStore((s) => s.edges)
   const filters = usePMGraphStore((s) => s.filters)
@@ -82,7 +86,19 @@ export default function GraphCanvas() {
 
   const { screenToFlowPosition, getNodes } = useReactFlow()
   const [focusPanel, setFocusPanel] = useState<FocusPanelState | null>(null)
-  const [commandBarOpen, setCommandBarOpen] = useState(false)
+
+  // Handle pending create from kanban view Ctrl+A
+  useEffect(() => {
+    if (pendingCreate) {
+      const el = document.querySelector(".react-flow__pane") as HTMLElement
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        const flowPos = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+        setFocusPanel({ mode: "create", flowPos })
+      }
+      onPendingCreateHandled?.()
+    }
+  }, [pendingCreate, screenToFlowPosition, onPendingCreateHandled])
 
   // connectingRef: tracks the source node/handle for wire-to-create
   // connectionMadeRef: set true when onConnect fires (real connection), so
@@ -269,20 +285,11 @@ export default function GraphCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+K works from anywhere (including inputs)
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault()
-        setCommandBarOpen((prev) => !prev)
-        return
-      }
-
       const tag = (e.target as HTMLElement).tagName
       const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 
       if (e.key === "Escape") {
-        if (commandBarOpen) {
-          setCommandBarOpen(false)
-        } else if (focusPanel) {
+        if (focusPanel) {
           setFocusPanel(null)
         } else if (taskPanelOpen) {
           setTaskPanelOpen(false)
@@ -298,19 +305,19 @@ export default function GraphCanvas() {
         return
       }
 
-      if (e.ctrlKey && e.shiftKey && e.key === "Z" && !isInput) {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Z" && !isInput) {
         e.preventDefault()
         redo()
         return
       }
 
-      if (e.ctrlKey && e.key === "z" && !isInput) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !isInput) {
         e.preventDefault()
         undo()
         return
       }
 
-      if (e.ctrlKey && e.key === "a" && !isInput) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "a" && !isInput) {
         e.preventDefault()
         const el = document.querySelector(".react-flow__pane") as HTMLElement
         if (!el) return
@@ -326,7 +333,7 @@ export default function GraphCanvas() {
         return
       }
 
-      if (e.ctrlKey && e.key === "g" && !isInput) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "g" && !isInput) {
         e.preventDefault()
         const el = document.querySelector(".react-flow__pane") as HTMLElement
         if (!el) return
@@ -338,7 +345,7 @@ export default function GraphCanvas() {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [
-    focusPanel, taskPanelOpen, selectedNodeId, commandBarOpen,
+    focusPanel, taskPanelOpen, selectedNodeId,
     screenToFlowPosition, setSelectedNode, setTaskPanelOpen,
     deleteNode, addNode, addGroupNode, undo, redo,
   ])
@@ -450,7 +457,7 @@ export default function GraphCanvas() {
         connectionLineType={ConnectionLineType.Bezier}
         connectionLineStyle={{ stroke: "#6b7280", strokeWidth: 2 }}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 5}}
         colorMode="dark"
         proOptions={{ hideAttribution: true }}
       >
@@ -497,20 +504,6 @@ export default function GraphCanvas() {
         />
       )}
 
-      {/* Command Bar (Ctrl+K) */}
-      {commandBarOpen && (
-        <CommandBar
-          onClose={() => setCommandBarOpen(false)}
-          onCreateTask={() => {
-            setCommandBarOpen(false)
-            const el = document.querySelector(".react-flow__pane") as HTMLElement
-            if (!el) return
-            const rect = el.getBoundingClientRect()
-            const flowPos = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
-            setFocusPanel({ mode: "create", flowPos })
-          }}
-        />
-      )}
     </div>
   )
 }

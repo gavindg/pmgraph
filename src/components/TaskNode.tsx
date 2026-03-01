@@ -12,9 +12,9 @@
  */
 import { memo } from "react"
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react"
-import type { TaskNodeData, Priority } from "../types"
+import type { TaskNodeData, Priority, Status } from "../types"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { getCategoryColor, PRIORITY_COLORS } from "../utils/colors"
+import { getCategoryColor, PRIORITY_COLORS, STATUS_COLORS } from "../utils/colors"
 
 function stringToColor(str: string): string {
   if (!str) return "#6b7280"
@@ -35,6 +35,7 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
   const preset = usePMGraphStore((s) => getActivePreset(s))
   const dept = (data.department as string) ?? ""
   const priority = (data.priority as Priority) ?? "medium"
+  const status = (data.status as Status) ?? "todo"
   const labels = (data.labels as { text: string; color: string }[]) ?? []
   const assignee = (data.assignee as string) ?? ""
   const dueDate = (data.dueDate as string | null) ?? null
@@ -77,7 +78,8 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
           type="target"
           position={Position.Left}
           id="in"
-          className="w-2! h-2! rounded-full! bg-white/25! border-0! left-0! top-1/2! -translate-y-1/2!"
+          isConnectableStart={false}
+          className="w-2.5! h-2.5! rounded-full! bg-white/25! border-0! left-0! top-1/2! -translate-y-1/2!"
         />
 
         {/* Labels */}
@@ -97,6 +99,13 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
 
         {/* Metadata row */}
         <div className="flex items-center gap-1.5 text-[11px] pr-4">
+          {/* Status dot */}
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: STATUS_COLORS[status].dot }}
+            title={status}
+          />
+
           {/* Priority exclamation */}
           <span
             className="font-bold leading-none shrink-0"
@@ -126,7 +135,7 @@ function TaskNode({ data, selected, dragging }: NodeProps<Node<TaskNodeData>>) {
           type="source"
           position={Position.Right}
           id="out"
-          className="w-2! h-2! rounded-full! bg-white/25! border-0! right-0! top-1/2! -translate-y-1/2!"
+          className="w-2.5! h-2.5! rounded-full! bg-white/25! border-0! right-0! top-1/2! -translate-y-1/2!"
         />
       </div>
     </div>

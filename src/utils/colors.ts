@@ -1,4 +1,4 @@
-import type { PresetCategory } from "../types"
+import type { PresetCategory, Status } from "../types"
 
 /**
  * Look up the hex color for a category name within a preset's categories.
@@ -56,3 +56,9 @@ export const PRIORITY_COLORS = {
   medium: { dot: "#facc15", bg: "#854d0e", text: "text-yellow-400" },
   high: { dot: "#f87171", bg: "#991b1b", text: "text-red-400" },
 } as const
+
+export const STATUS_COLORS: Record<Status, { dot: string; bg: string }> = {
+  "todo": { dot: "#6b7280", bg: "#374151" },
+  "in-progress": { dot: "#3b82f6", bg: "#1e3a5f" },
+  "done": { dot: "#22c55e", bg: "#166534" },
+}

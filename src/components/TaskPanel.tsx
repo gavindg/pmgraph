@@ -11,11 +11,13 @@
  */
 import { useState, useRef, useEffect, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS, LABEL_COLORS } from "../utils/colors"
+import { PRIORITY_COLORS, LABEL_COLORS, STATUS_COLORS } from "../utils/colors"
 import { DUMMY_USERS } from "../utils/users"
-import type { Priority, TaskNodeData, LabelItem } from "../types"
+import type { Priority, Status, TaskNodeData, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
+const STATUSES: Status[] = ["todo", "in-progress", "done"]
+const STATUS_LABELS: Record<Status, string> = { "todo": "Todo", "in-progress": "In Progress", "done": "Done" }
 
 export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
   const nodes = usePMGraphStore((s) => s.nodes)
@@ -76,6 +78,30 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
 
             {/* ── Classification ────────────────────────────────── */}
             <SectionHeader>Classification</SectionHeader>
+
+            {/* Status — segmented control */}
+            <Field label="Status">
+              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
+                {STATUSES.map((s) => {
+                  const active = data.status === s
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => update({ status: s })}
+                      className={[
+                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
+                        active
+                          ? "text-white"
+                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+                      ].join(" ")}
+                      style={active ? { backgroundColor: STATUS_COLORS[s].bg } : {}}
+                    >
+                      {STATUS_LABELS[s]}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
 
             {/* Priority — segmented control */}
             <Field label="Priority">

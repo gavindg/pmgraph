@@ -8,11 +8,13 @@
  */
 import { useState, useEffect, useRef, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS, LABEL_COLORS } from "../utils/colors"
+import { PRIORITY_COLORS, LABEL_COLORS, STATUS_COLORS } from "../utils/colors"
 import { DUMMY_USERS } from "../utils/users"
-import type { TaskNodeData, Priority, LabelItem } from "../types"
+import type { TaskNodeData, Priority, Status, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
+const STATUSES: Status[] = ["todo", "in-progress", "done"]
+const STATUS_LABELS: Record<Status, string> = { "todo": "Todo", "in-progress": "In Progress", "done": "Done" }
 
 interface NodeFocusPanelProps {
   mode: "create" | "edit"
@@ -32,6 +34,7 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
   const [description, setDescription] = useState(existingData?.description ?? "")
   const [department, setDepartment] = useState(existingData?.department ?? "")
   const [assignee, setAssignee] = useState(existingData?.assignee ?? "")
+  const [status, setStatus] = useState<Status>(existingData?.status ?? "todo")
   const [priority, setPriority] = useState<Priority>(existingData?.priority ?? "medium")
   const [labels, setLabels] = useState<LabelItem[]>(existingData?.labels ?? [])
   const [labelInput, setLabelInput] = useState("")
@@ -50,6 +53,7 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
       description,
       department,
       assignee,
+      status,
       priority,
       labels,
       dueDate: dueDate || null,
@@ -136,6 +140,31 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
                     {cat.name}
                   </ChipButton>
                 ))}
+              </div>
+            </Field>
+
+            {/* Status */}
+            <Field label="Status">
+              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
+                {STATUSES.map((s) => {
+                  const active = status === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(s)}
+                      className={[
+                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
+                        active
+                          ? "text-white"
+                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+                      ].join(" ")}
+                      style={active ? { backgroundColor: STATUS_COLORS[s].bg } : {}}
+                    >
+                      {STATUS_LABELS[s]}
+                    </button>
+                  )
+                })}
               </div>
             </Field>
 

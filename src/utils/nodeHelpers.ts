@@ -18,6 +18,7 @@ export function createDefaultNode(
       title: "Untitled",
       description: "",
       priority: "medium",
+      status: "todo",
       department: "",
       labels: [],
       assignee: "",

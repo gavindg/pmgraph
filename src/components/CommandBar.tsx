@@ -2,11 +2,10 @@
  * CommandBar — Linear-style command palette (Ctrl+K).
  *
  * Fuzzy search for existing tasks (top 5 results).
- * Select a task → close bar, zoom to it in the canvas.
- * "Create Task" command opens NodeFocusPanel.
+ * Select a task → close bar, select it + open TaskPanel.
+ * Commands: Create Task, Kanban View, Graph View, Toggle View.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import { useReactFlow } from "@xyflow/react"
 import { usePMGraphStore } from "../store/usePMGraphStore"
 import { getCategoryColor } from "../utils/colors"
 import { getActivePreset } from "../store/usePMGraphStore"
@@ -28,8 +27,10 @@ interface ResultItem {
 export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
   const nodes = usePMGraphStore((s) => s.nodes)
   const setSelectedNode = usePMGraphStore((s) => s.setSelectedNode)
+  const setTaskPanelOpen = usePMGraphStore((s) => s.setTaskPanelOpen)
+  const activeView = usePMGraphStore((s) => s.activeView)
+  const setActiveView = usePMGraphStore((s) => s.setActiveView)
   const preset = usePMGraphStore((s) => getActivePreset(s))
-  const { setCenter, getNode } = useReactFlow()
 
   const [query, setQuery] = useState("")
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -46,6 +47,15 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
     // Commands
     if (!q || "create task".includes(q)) {
       items.push({ type: "command", id: "create-task", label: "Create Task", subtitle: "Ctrl+A" })
+    }
+    if (!q || "kanban view".includes(q) || "board".includes(q)) {
+      items.push({ type: "command", id: "kanban-view", label: "Kanban View", subtitle: activeView === "kanban" ? "Current" : undefined })
+    }
+    if (!q || "graph view".includes(q)) {
+      items.push({ type: "command", id: "graph-view", label: "Graph View", subtitle: activeView === "graph" ? "Current" : undefined })
+    }
+    if (!q || "toggle view".includes(q) || "switch view".includes(q)) {
+      items.push({ type: "command", id: "toggle-view", label: "Toggle View" })
     }
 
     // Task search
@@ -73,7 +83,7 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
     }
 
     return items
-  }, [query, nodes, preset.categories])
+  }, [query, nodes, preset.categories, activeView])
 
   useEffect(() => {
     setSelectedIndex(0)
@@ -81,20 +91,23 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
 
   const handleSelect = useCallback(
     (item: ResultItem) => {
-      if (item.type === "command" && item.id === "create-task") {
-        onCreateTask()
+      if (item.type === "command") {
+        if (item.id === "create-task") {
+          onCreateTask()
+        } else if (item.id === "kanban-view") {
+          setActiveView("kanban")
+        } else if (item.id === "graph-view") {
+          setActiveView("graph")
+        } else if (item.id === "toggle-view") {
+          setActiveView(activeView === "graph" ? "kanban" : "graph")
+        }
       } else if (item.type === "task") {
         setSelectedNode(item.id)
-        const node = getNode(item.id)
-        if (node) {
-          const x = node.position.x + (node.measured?.width ?? 180) / 2
-          const y = node.position.y + (node.measured?.height ?? 80) / 2
-          setCenter(x, y, { zoom: 1.5, duration: 300 })
-        }
+        setTaskPanelOpen(true)
       }
       onClose()
     },
-    [onClose, onCreateTask, setSelectedNode, getNode, setCenter]
+    [onClose, onCreateTask, setSelectedNode, setTaskPanelOpen, setActiveView, activeView]
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
