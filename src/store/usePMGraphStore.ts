@@ -23,6 +23,7 @@ import type {
   Preset,
   EdgeType,
   PMEdgeData,
+  StatusDefinition,
 } from "../types"
 
 const MAX_HISTORY = 50
@@ -45,6 +46,8 @@ interface PMGraphState {
   filters: Filters
   activePresetId: string
   collapsedGroups: Set<string>
+  // Per-preset custom statuses appended to the preset's default statuses
+  customStatuses: Record<string, StatusDefinition[]>
 
   // ── UI state ──────────────────────────────────────────────────────
   activeView: "graph" | "kanban"
@@ -78,6 +81,8 @@ interface PMGraphState {
 
   // ── Preset actions ────────────────────────────────────────────────
   setPreset: (presetId: string) => void
+  addStatus: (status: StatusDefinition) => void
+  removeStatus: (statusId: string) => void
 
   // ── Node status ──────────────────────────────────────────────────
   setNodeStatus: (id: string, status: Status) => void
@@ -110,6 +115,7 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
   filters: defaultFilters,
   activePresetId: "gamedev",
   collapsedGroups: new Set<string>(),
+  customStatuses: {},
   activeView: "graph",
   taskPanelOpen: false,
   _past: [],
@@ -316,6 +322,40 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
     }))
   },
 
+  addStatus: (status) => {
+    set((s) => {
+      const presetId = s.activePresetId
+      const existing = s.customStatuses[presetId] ?? []
+      if (existing.some((st) => st.id === status.id)) return s
+      return {
+        customStatuses: { ...s.customStatuses, [presetId]: [...existing, status] },
+      }
+    })
+  },
+
+  removeStatus: (statusId) => {
+    set((s) => {
+      const presetId = s.activePresetId
+      const existing = s.customStatuses[presetId] ?? []
+      return {
+        customStatuses: {
+          ...s.customStatuses,
+          [presetId]: existing.filter((st) => st.id !== statusId),
+        },
+        // Reset any nodes with this status to the first available status
+        nodes: s.nodes.map((n) => {
+          if (n.type !== "task") return n
+          if ((n.data as TaskNodeData).status === statusId) {
+            const preset = getPresetById(presetId)
+            const fallback = preset.statuses[0]?.id ?? "todo"
+            return { ...n, data: { ...n.data, status: fallback } }
+          }
+          return n
+        }),
+      }
+    })
+  },
+
   // ── Node status ──────────────────────────────────────────────────
 
   setNodeStatus: (id, status) => {
@@ -392,8 +432,27 @@ export const usePMGraphStore = create<PMGraphState>((set) => ({
 
 // ── Selectors ─────────────────────────────────────────────────────────────────
 
+// Memoized preset selector — avoids creating a new object on every call
+// which would cause infinite re-renders with Zustand's Object.is check.
+const EMPTY_STATUSES: StatusDefinition[] = []
+let _cachedPresetId: string | null = null
+let _cachedCustom: StatusDefinition[] = EMPTY_STATUSES
+let _cachedPreset: Preset | null = null
+
 export function getActivePreset(state: PMGraphState): Preset {
-  return getPresetById(state.activePresetId)
+  const base = getPresetById(state.activePresetId)
+  const custom = state.customStatuses[state.activePresetId] ?? EMPTY_STATUSES
+  if (
+    _cachedPresetId === state.activePresetId &&
+    _cachedCustom === custom &&
+    _cachedPreset
+  ) {
+    return _cachedPreset
+  }
+  _cachedPresetId = state.activePresetId
+  _cachedCustom = custom
+  _cachedPreset = custom.length === 0 ? base : { ...base, statuses: [...base.statuses, ...custom] }
+  return _cachedPreset
 }
 
 export function getFilteredNodeIds(nodes: Node[], filters: Filters): Set<string> {

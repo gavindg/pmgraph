@@ -1,4 +1,10 @@
-import type { Preset } from "../types"
+import type { Preset, StatusDefinition } from "../types"
+
+export const DEFAULT_STATUSES: StatusDefinition[] = [
+	{ id: "todo", label: "Todo", color: "#6b7280" },
+	{ id: "in-progress", label: "In Progress", color: "#3b82f6" },
+	{ id: "done", label: "Done", color: "#22c55e" },
+]
 
 export const PRESETS: Preset[] = [
 	{
@@ -11,6 +17,7 @@ export const PRESETS: Preset[] = [
 			{ name: "Audio", color: "#F67E18" },
 			{ name: "QA", color: "#22c67e" },
 		],
+		statuses: DEFAULT_STATUSES,
 	},
 	{
 		id: "startup",
@@ -22,6 +29,7 @@ export const PRESETS: Preset[] = [
 			{ name: "Marketing", color: "#f97316" },
 			{ name: "Ops", color: "#22c55e" },
 		],
+		statuses: DEFAULT_STATUSES,
 	},
 	{
 		id: "personal",
@@ -32,6 +40,7 @@ export const PRESETS: Preset[] = [
 			{ name: "Health", color: "#22c55e" },
 			{ name: "Learning", color: "#eab308" },
 		],
+		statuses: DEFAULT_STATUSES,
 	},
 ]
 

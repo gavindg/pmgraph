@@ -1,4 +1,4 @@
-import type { PresetCategory, Status } from "../types"
+import type { PresetCategory, StatusDefinition } from "../types"
 
 /**
  * Look up the hex color for a category name within a preset's categories.
@@ -57,8 +57,18 @@ export const PRIORITY_COLORS = {
 	high: { dot: "#f87171", bg: "#991b1b", text: "text-red-400" },
 } as const
 
-export const STATUS_COLORS: Record<Status, { dot: string; bg: string }> = {
-  "todo": { dot: "#6b7280", bg: "#374151" },
-  "in-progress": { dot: "#3b82f6", bg: "#1e3a5f" },
-  "done": { dot: "#22c55e", bg: "#166534" },
+/**
+ * Look up status color from preset statuses. Returns the status color or gray fallback.
+ */
+export function getStatusColor(statuses: StatusDefinition[], statusId: string): string {
+  const s = statuses.find((st) => st.id === statusId)
+  return s?.color ?? "#6b7280"
+}
+
+/**
+ * Darken a hex color for use as a background (mix with black at ~40% opacity).
+ */
+export function getStatusBg(statuses: StatusDefinition[], statusId: string): string {
+  const color = getStatusColor(statuses, statusId)
+  return hexToRgba(color, 0.3)
 }

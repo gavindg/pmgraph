@@ -1,5 +1,7 @@
 export type Priority = "low" | "medium" | "high"
-export type Status = "todo" | "in-progress" | "done"
+
+// Status is now a dynamic string (driven by the active preset's statuses).
+export type Status = string
 
 // Department is now a dynamic string (driven by the active preset's categories).
 // Empty string means uncategorized.
@@ -58,8 +60,15 @@ export interface PresetCategory {
   color: string // hex, e.g. "#3b82f6"
 }
 
+export interface StatusDefinition {
+  id: string      // e.g. "todo", "in-progress", "done", "review"
+  label: string   // e.g. "Todo", "In Progress", "Done"
+  color: string   // hex color for dot/bg
+}
+
 export interface Preset {
   id: string
   label: string
   categories: PresetCategory[]
+  statuses: StatusDefinition[]
 }

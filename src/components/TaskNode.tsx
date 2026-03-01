@@ -7,7 +7,7 @@
  * - Right handle turns green when done
  * - Left handle turns green when all dependencies are done (or no deps)
  */
-import { memo, useMemo } from "react"
+import { memo, useMemo, useState, useRef, useEffect } from "react"
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react"
 import type { TaskNodeData, Priority, Status } from "../types"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
@@ -33,6 +33,33 @@ function TaskNode({ id, data, selected, dragging }: NodeProps<Node<TaskNodeData>
   const edges = usePMGraphStore((s) => s.edges)
   const nodes = usePMGraphStore((s) => s.nodes)
   const setNodeStatus = usePMGraphStore((s) => s.setNodeStatus)
+  const updateNode = usePMGraphStore((s) => s.updateNode)
+
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState(data.title as string)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingTitle) {
+      titleInputRef.current?.focus()
+      titleInputRef.current?.select()
+    }
+  }, [editingTitle])
+
+  // Sync local state when data changes externally
+  useEffect(() => {
+    if (!editingTitle) setTitleValue(data.title as string)
+  }, [data.title, editingTitle])
+
+  const commitTitle = () => {
+    const trimmed = titleValue.trim()
+    if (trimmed && trimmed !== data.title) {
+      updateNode(id, { title: trimmed })
+    } else {
+      setTitleValue(data.title as string)
+    }
+    setEditingTitle(false)
+  }
 
   const dept = (data.department as string) ?? ""
   const priority = (data.priority as Priority) ?? "medium"
@@ -104,12 +131,31 @@ function TaskNode({ id, data, selected, dragging }: NodeProps<Node<TaskNodeData>
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className={[
-            "text-sm font-semibold leading-snug break-words",
-            isDone ? "text-white/60 line-through" : "text-white",
-          ].join(" ")}>
-            {(data.title as string) || "Untitled"}
-          </div>
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitTitle()
+                if (e.key === "Escape") { setTitleValue(data.title as string); setEditingTitle(false) }
+                e.stopPropagation()
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm font-semibold leading-snug bg-transparent border-none outline-none text-white w-full px-0 py-0"
+            />
+          ) : (
+            <div
+              className={[
+                "text-sm font-semibold leading-snug break-words cursor-text hover:bg-white/5 rounded px-0.5 -mx-0.5",
+                isDone ? "text-white/60 line-through" : "text-white",
+              ].join(" ")}
+              onClick={(e) => { e.stopPropagation(); setEditingTitle(true) }}
+            >
+              {(data.title as string) || "Untitled"}
+            </div>
+          )}
           {dept && (
             <div className="text-[11px] italic text-white/40 mt-0.5">{dept}</div>
           )}

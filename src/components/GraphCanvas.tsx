@@ -19,7 +19,6 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  MiniMap,
   Controls,
   ConnectionLineType,
   useReactFlow,
@@ -36,8 +35,7 @@ import TaskNode from "./TaskNode"
 import GroupNode from "./GroupNode"
 import TypedEdge from "./TypedEdge"
 import NodeFocusPanel from "./NodeFocusPanel"
-import { usePMGraphStore, getActivePreset, getFilteredNodeIds } from "../store/usePMGraphStore"
-import { getCategoryColor } from "../utils/colors"
+import { usePMGraphStore, getFilteredNodeIds } from "../store/usePMGraphStore"
 import type { TaskNodeData, PMEdgeData, EdgeType } from "../types"
 
 // Stable references — defined outside component to avoid remounts
@@ -58,9 +56,11 @@ interface FocusPanelState {
 interface GraphCanvasProps {
   pendingCreate?: boolean
   onPendingCreateHandled?: () => void
+  pendingFocusNode?: string | null
+  onPendingFocusHandled?: () => void
 }
 
-export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: GraphCanvasProps = {}) {
+export default function GraphCanvas({ pendingCreate, onPendingCreateHandled, pendingFocusNode, onPendingFocusHandled }: GraphCanvasProps = {}) {
   const nodes = usePMGraphStore((s) => s.nodes)
   const edges = usePMGraphStore((s) => s.edges)
   const filters = usePMGraphStore((s) => s.filters)
@@ -80,12 +80,25 @@ export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: G
   const addGroupNode = usePMGraphStore((s) => s.addGroupNode)
   const undo = usePMGraphStore((s) => s.undo)
   const redo = usePMGraphStore((s) => s.redo)
-  const preset = usePMGraphStore((s) => getActivePreset(s))
-
   const setNodePosition = usePMGraphStore((s) => s.setNodePosition)
 
-  const { screenToFlowPosition, getNodes } = useReactFlow()
+  const { screenToFlowPosition, getNodes, setCenter } = useReactFlow()
   const [focusPanel, setFocusPanel] = useState<FocusPanelState | null>(null)
+
+  // Handle pending focus node from command bar navigation
+  useEffect(() => {
+    if (pendingFocusNode) {
+      const node = nodes.find((n) => n.id === pendingFocusNode)
+      if (node) {
+        const w = node.measured?.width ?? 180
+        const h = node.measured?.height ?? 80
+        setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1.2, duration: 300 })
+        setSelectedNode(pendingFocusNode)
+        setTaskPanelOpen(true)
+      }
+      onPendingFocusHandled?.()
+    }
+  }, [pendingFocusNode])
 
   // Handle pending create from kanban view Ctrl+A
   useEffect(() => {
@@ -317,7 +330,7 @@ export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: G
         return
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "a" && !isInput) {
+      if (e.key === "a" && !isInput && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
         const el = document.querySelector(".react-flow__pane") as HTMLElement
         if (!el) return
@@ -424,16 +437,6 @@ export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: G
     [getNodes, setNodePosition]
   )
 
-  // ── MiniMap node color ─────────────────────────────────────────────
-  const minimapNodeColor = useCallback(
-    (n: Node) => {
-      if (n.type === "group") return (n.data as { color?: string })?.color ?? "#6b7280"
-      const dept = (n.data as TaskNodeData)?.department ?? ""
-      return getCategoryColor(preset.categories, dept as string)
-    },
-    [preset.categories]
-  )
-
   return (
     <div className="w-full h-full relative" onDoubleClick={handleCanvasDoubleClick}>
       <ReactFlow
@@ -466,15 +469,6 @@ export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: G
           size={1}
           color="#374151"
         />
-        <MiniMap
-          nodeColor={minimapNodeColor}
-          maskColor="#111827cc"
-          style={{
-            backgroundColor: "#111827",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-panel)",
-          }}
-        />
         <Controls />
       </ReactFlow>
 
@@ -483,9 +477,9 @@ export default function GraphCanvas({ pendingCreate, onPendingCreateHandled }: G
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <p className="text-[var(--color-text-muted)] text-sm">
-              No tasks yet. Double-click or{" "}
+              No tasks yet. Double-click or press{" "}
               <kbd className="px-1.5 py-0.5 rounded bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)] text-xs font-mono">
-                Ctrl+A
+                A
               </kbd>{" "}
               to create one.
             </p>

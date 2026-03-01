@@ -6,10 +6,6 @@
  */
 import { useState, useRef, useEffect } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import type { Status } from "../types"
-
-type StatusFilter = "all" | "active" | "done"
-
 export default function FilterBar() {
   const filters = usePMGraphStore((s) => s.filters)
   const setFilters = usePMGraphStore((s) => s.setFilters)
@@ -17,46 +13,54 @@ export default function FilterBar() {
   const setActiveView = usePMGraphStore((s) => s.setActiveView)
   const preset = usePMGraphStore((s) => getActivePreset(s))
 
-  // Derive current status filter tab from filters.statuses
-  const currentTab: StatusFilter =
+  // Derive current tab: "all" or a specific status id
+  const currentTab =
     filters.statuses.length === 0
       ? "all"
-      : filters.statuses.length === 1 && filters.statuses[0] === "done"
-        ? "done"
-        : "active"
+      : filters.statuses.length === 1
+        ? filters.statuses[0]
+        : "all"
 
-  const setTab = (tab: StatusFilter) => {
-    const statuses: Status[] =
-      tab === "all" ? [] : tab === "done" ? ["done"] : ["todo", "in-progress"]
-    setFilters({ statuses })
+  const setTab = (tab: string) => {
+    setFilters({ statuses: tab === "all" ? [] : [tab] })
   }
 
   return (
-    <header className="flex items-center h-10 px-4 bg-[var(--color-surface-raised)] border-b border-[var(--color-border-default)] shrink-0">
+    <header className="flex items-center h-12 px-4 bg-[var(--color-surface-raised)] border-b border-[var(--color-border-default)] shrink-0">
       {/* Left side */}
       <div className="flex items-center gap-4">
-        <span className="text-sm font-bold text-[var(--color-text-primary)] shrink-0">
+        <button
+          onClick={() => setActiveView("graph")}
+          className="text-base font-bold text-[var(--color-text-primary)] shrink-0 hover:text-white transition-colors"
+        >
           PMGraph
-        </span>
+        </button>
 
         {/* Status tabs */}
         <nav className="flex items-center gap-0.5">
-          {([
-            { key: "all", label: "All Tasks" },
-            { key: "active", label: "Active" },
-            { key: "done", label: "Done" },
-          ] as const).map((tab) => (
+          <button
+            onClick={() => setTab("all")}
+            className={[
+              "text-xs px-2.5 py-1 rounded-md transition-colors duration-150",
+              currentTab === "all"
+                ? "bg-[var(--color-surface-overlay)] text-[var(--color-text-primary)] font-medium"
+                : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+            ].join(" ")}
+          >
+            All Tasks
+          </button>
+          {preset.statuses.map((s) => (
             <button
-              key={tab.key}
-              onClick={() => setTab(tab.key)}
+              key={s.id}
+              onClick={() => setTab(s.id)}
               className={[
                 "text-xs px-2.5 py-1 rounded-md transition-colors duration-150",
-                currentTab === tab.key
+                currentTab === s.id
                   ? "bg-[var(--color-surface-overlay)] text-[var(--color-text-primary)] font-medium"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
               ].join(" ")}
             >
-              {tab.label}
+              {s.label}
             </button>
           ))}
         </nav>

@@ -62,6 +62,9 @@ body,
 input, button, select, textarea, kbd {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
+button {
+  cursor: pointer;
+}
 
 /* ── React Flow overrides ────────────────────────────────────────── */
 .react-flow__renderer {

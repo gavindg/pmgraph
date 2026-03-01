@@ -1,24 +1,28 @@
 /**
- * TaskPanel — Polished right-side panel for editing a selected task.
+ * TaskPanel — Right-side panel for editing a selected task.
  *
  * Features:
+ * - Resizable width via drag handle
  * - Slide-in/out animation via isOpen prop
  * - Inline editable title
  * - Priority as segmented control
+ * - Status as chips with add/remove
  * - Department as colored chip buttons (from active preset)
  * - Labels as tag pills with remove
- * - Clean section grouping
+ * - Calendar date picker for due date
  */
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS, LABEL_COLORS, STATUS_COLORS } from "../utils/colors"
-import { DUMMY_USERS } from "../utils/users"
-import DropdownInput from "./DropdownInput"
-import type { Priority, Status, TaskNodeData, LabelItem } from "../types"
+import { getPresetById } from "../utils/presets"
+import { PRIORITY_COLORS, LABEL_COLORS, getStatusBg } from "../utils/colors"
+import DatePicker from "./DatePicker"
+import type { Priority, TaskNodeData, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
-const STATUSES: Status[] = ["todo", "in-progress", "done"]
-const STATUS_LABELS: Record<Status, string> = { "todo": "Todo", "in-progress": "In Progress", "done": "Done" }
+
+const STATUS_COLOR_OPTIONS = [
+  "#6b7280", "#3b82f6", "#8b5cf6", "#ec4899", "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
+]
 
 export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
   const nodes = usePMGraphStore((s) => s.nodes)
@@ -26,46 +30,87 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
   const updateNode = usePMGraphStore((s) => s.updateNode)
   const deleteNode = usePMGraphStore((s) => s.deleteNode)
   const setTaskPanelOpen = usePMGraphStore((s) => s.setTaskPanelOpen)
+  const addStatus = usePMGraphStore((s) => s.addStatus)
+  const removeStatus = usePMGraphStore((s) => s.removeStatus)
+  const activePresetId = usePMGraphStore((s) => s.activePresetId)
   const preset = usePMGraphStore((s) => getActivePreset(s))
+
+  const baseStatusIds = useMemo(() => {
+    return new Set(getPresetById(activePresetId).statuses.map((s) => s.id))
+  }, [activePresetId])
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
   const data = selectedNode?.data as TaskNodeData | undefined
-
-  // Collect all unique labels across all task nodes for dropdown suggestions
-  const allLabels = useMemo(() => {
-    const map = new Map<string, LabelItem>()
-    for (const n of nodes) {
-      if (n.type !== "task") continue
-      for (const l of (n.data as TaskNodeData).labels ?? []) {
-        if (!map.has(l.text)) map.set(l.text, l)
-      }
-    }
-    return Array.from(map.values())
-  }, [nodes])
 
   const update = (patch: Partial<TaskNodeData>) => {
     if (selectedNode) updateNode(selectedNode.id, patch)
   }
 
+  // ── Resizable width ──────────────────────────────────────────────
+  const [panelWidth, setPanelWidth] = useState(320)
+  const draggingRef = useRef(false)
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(320)
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    draggingRef.current = true
+    startXRef.current = e.clientX
+    startWidthRef.current = panelWidth
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+  }, [panelWidth])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return
+      const delta = startXRef.current - e.clientX
+      const newWidth = Math.max(280, Math.min(600, startWidthRef.current + delta))
+      setPanelWidth(newWidth)
+    }
+    const onUp = () => {
+      if (draggingRef.current) {
+        draggingRef.current = false
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+      }
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+    return () => {
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+  }, [])
+
   return (
     <aside
       className={[
-        "shrink-0 flex flex-col bg-[var(--color-surface-raised)]/95 backdrop-blur-md",
+        "shrink-0 flex bg-[var(--color-surface-raised)]/95 backdrop-blur-md",
         "border-l border-[var(--color-border-default)] overflow-y-auto overflow-x-hidden",
         "transition-all duration-200 ease-out",
-        isOpen ? "w-80" : "w-0 border-l-0",
+        isOpen ? "" : "w-0 border-l-0",
       ].join(" ")}
+      style={isOpen ? { width: panelWidth } : undefined}
     >
+      {/* Resize handle */}
+      {isOpen && (
+        <div
+          onMouseDown={onResizeStart}
+          className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
+        />
+      )}
+
       {!data ? null : (
-        <>
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-            <span className="text-[10px] uppercase tracking-widest text-text-muted">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border-subtle)]">
+            <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
               Task Details
             </span>
             <button
               onClick={() => setTaskPanelOpen(false)}
-              className="text-text-muted hover:text-text-primary transition-colors text-lg leading-none"
+              className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors text-lg leading-none"
             >
               ×
             </button>
@@ -92,28 +137,16 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
             {/* ── Classification ────────────────────────────────── */}
             <SectionHeader>Classification</SectionHeader>
 
-            {/* Status — segmented control */}
+            {/* Status — chips with add/remove */}
             <Field label="Status">
-              <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
-                {STATUSES.map((s) => {
-                  const active = data.status === s
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => update({ status: s })}
-                      className={[
-                        "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
-                        active
-                          ? "text-white"
-                          : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
-                      ].join(" ")}
-                      style={active ? { backgroundColor: STATUS_COLORS[s].bg } : {}}
-                    >
-                      {STATUS_LABELS[s]}
-                    </button>
-                  )
-                })}
-              </div>
+              <StatusControl
+                statuses={preset.statuses}
+                activeStatus={data.status as string}
+                baseStatusIds={baseStatusIds}
+                onSelect={(id) => update({ status: id })}
+                onAdd={addStatus}
+                onRemove={removeStatus}
+              />
             </Field>
 
             {/* Priority — segmented control */}
@@ -181,12 +214,11 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
             <SectionHeader>Metadata</SectionHeader>
 
             <Field label="Assignee">
-              <DropdownInput
-                value={data.assignee as string}
-                onChange={(v) => update({ assignee: v })}
-                suggestions={DUMMY_USERS}
-                placeholder="Who owns this?"
+              <input
                 className={inputClass}
+                value={data.assignee as string}
+                onChange={(e) => update({ assignee: e.target.value })}
+                placeholder="Who owns this?"
               />
             </Field>
 
@@ -194,16 +226,14 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
               <LabelEditor
                 labels={data.labels as LabelItem[]}
                 onChange={(labels) => update({ labels })}
-                allLabels={allLabels}
               />
             </Field>
 
             <Field label="Due Date">
-              <input
-                type="date"
-                className={inputClass}
+              <DatePicker
                 value={(data.dueDate as string) ?? ""}
-                onChange={(e) => update({ dueDate: e.target.value || null })}
+                onChange={(v) => update({ dueDate: v || null })}
+                className={inputClass}
               />
             </Field>
           </div>
@@ -219,7 +249,7 @@ export default function TaskPanel({ isOpen }: { isOpen: boolean }) {
               Delete Task
             </button>
           </div>
-        </>
+        </div>
       )}
     </aside>
   )
@@ -297,46 +327,35 @@ function EditableTitle({
 function LabelEditor({
   labels,
   onChange,
-  allLabels,
 }: {
   labels: LabelItem[]
   onChange: (labels: LabelItem[]) => void
-  allLabels: LabelItem[]
 }) {
   const [input, setInput] = useState("")
   const [color, setColor] = useState<string>(LABEL_COLORS[0])
 
-  const addLabel = (text: string) => {
-    const trimmed = text.trim()
-    if (!trimmed || labels.some((l) => l.text === trimmed)) return
-    // Reuse color from existing label if it exists
-    const existing = allLabels.find((l) => l.text === trimmed)
-    onChange([...labels, { text: trimmed, color: existing?.color ?? color }])
+  const addLabel = () => {
+    const trimmed = input.trim()
+    if (trimmed && !labels.some((l) => l.text === trimmed)) {
+      onChange([...labels, { text: trimmed, color }])
+    }
     setInput("")
   }
-
-  // Suggestions: all known labels not already added, filtered by input
-  const suggestions = useMemo(() => {
-    const added = new Set(labels.map((l) => l.text))
-    let available = allLabels.filter((l) => !added.has(l.text)).map((l) => l.text)
-    if (input) {
-      const q = input.toLowerCase()
-      available = available.filter((t) => t.toLowerCase().includes(q))
-    }
-    return available
-  }, [input, labels, allLabels])
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
-        <DropdownInput
-          value={input}
-          onChange={setInput}
-          onSelect={(v) => addLabel(v)}
-          onCommit={(v) => addLabel(v)}
-          suggestions={suggestions}
-          placeholder="Search or create label…"
+        <input
           className={`${inputClass} flex-1`}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              addLabel()
+            }
+          }}
+          placeholder="Type and press Enter"
         />
         <div className="flex items-center gap-1">
           {LABEL_COLORS.map((c) => (
@@ -370,6 +389,119 @@ function LabelEditor({
               </button>
             </span>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatusControl({
+  statuses,
+  activeStatus,
+  baseStatusIds,
+  onSelect,
+  onAdd,
+  onRemove,
+}: {
+  statuses: { id: string; label: string; color: string }[]
+  activeStatus: string
+  baseStatusIds: Set<string>
+  onSelect: (id: string) => void
+  onAdd: (status: { id: string; label: string; color: string }) => void
+  onRemove: (id: string) => void
+}) {
+  const [adding, setAdding] = useState(false)
+  const [newLabel, setNewLabel] = useState("")
+  const [newColor, setNewColor] = useState("#6b7280")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (adding) inputRef.current?.focus()
+  }, [adding])
+
+  const handleAdd = () => {
+    const label = newLabel.trim()
+    if (!label) { setAdding(false); return }
+    const id = label.toLowerCase().replace(/\s+/g, "-")
+    if (statuses.some((s) => s.id === id)) { setAdding(false); return }
+    onAdd({ id, label, color: newColor })
+    setNewLabel("")
+    setAdding(false)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {statuses.map((s) => {
+          const active = activeStatus === s.id
+          const isCustom = !baseStatusIds.has(s.id)
+          return (
+            <div key={s.id} className="relative group">
+              <button
+                onClick={() => onSelect(s.id)}
+                className={[
+                  "text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors duration-150",
+                  active
+                    ? "text-white"
+                    : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
+                ].join(" ")}
+                style={active ? { backgroundColor: getStatusBg(statuses, s.id) } : {}}
+              >
+                {s.label}
+              </button>
+              {isCustom && !active && (
+                <button
+                  onClick={() => onRemove(s.id)}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900/80 text-red-300 text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove status"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )
+        })}
+        <button
+          onClick={() => setAdding(true)}
+          className="text-xs px-2 py-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors"
+        >
+          +
+        </button>
+      </div>
+      {adding && (
+        <div className="flex flex-col gap-2 p-2 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)]">
+          <input
+            ref={inputRef}
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd()
+              if (e.key === "Escape") setAdding(false)
+            }}
+            placeholder="Status name…"
+            className="text-xs bg-transparent border border-[var(--color-border-default)] rounded-md px-2 py-1 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none focus:border-[var(--color-text-muted)]"
+          />
+          <div className="flex gap-1">
+            {STATUS_COLOR_OPTIONS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setNewColor(c)}
+                className={[
+                  "w-3.5 h-3.5 rounded-full shrink-0 transition-transform",
+                  newColor === c ? "scale-125 ring-1 ring-white/50 ring-offset-1 ring-offset-[var(--color-surface-overlay)]" : "opacity-50 hover:opacity-100",
+                ].join(" ")}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <div className="flex gap-1.5">
+            <button onClick={handleAdd} className="flex-1 py-1 text-[10px] font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors">
+              Add
+            </button>
+            <button onClick={() => setAdding(false)} className="flex-1 py-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>

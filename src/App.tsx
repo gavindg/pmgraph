@@ -20,6 +20,8 @@ export default function App() {
   const [commandBarOpen, setCommandBarOpen] = useState(false)
   // Signal to GraphCanvas to open create panel after switching from kanban
   const [pendingCreate, setPendingCreate] = useState(false)
+  // Signal to GraphCanvas to focus on a node after command bar navigation
+  const [pendingFocusNode, setPendingFocusNode] = useState<string | null>(null)
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -29,10 +31,20 @@ export default function App() {
         setCommandBarOpen((prev) => !prev)
         return
       }
-      // Ctrl/Cmd+A from kanban → switch to graph and create
-      if ((e.ctrlKey || e.metaKey) && e.key === "a" && activeView === "kanban") {
-        const tag = (e.target as HTMLElement).tagName
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
+
+      const tag = (e.target as HTMLElement).tagName
+      const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
+      if (isInput) return
+
+      // T → toggle view
+      if (e.key === "t" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        setActiveView(activeView === "graph" ? "kanban" : "graph")
+        return
+      }
+
+      // A → create node (from kanban, switch to graph first)
+      if (e.key === "a" && !e.ctrlKey && !e.metaKey && activeView === "kanban") {
         e.preventDefault()
         setPendingCreate(true)
         setActiveView("graph")
@@ -52,6 +64,8 @@ export default function App() {
               <GraphCanvas
                 pendingCreate={pendingCreate}
                 onPendingCreateHandled={() => setPendingCreate(false)}
+                pendingFocusNode={pendingFocusNode}
+                onPendingFocusHandled={() => setPendingFocusNode(null)}
               />
             </div>
           </ReactFlowProvider>
@@ -68,6 +82,11 @@ export default function App() {
           onCreateTask={() => {
             setCommandBarOpen(false)
             setActiveView("graph")
+          }}
+          onNavigateToNode={(nodeId) => {
+            setCommandBarOpen(false)
+            setActiveView("graph")
+            setPendingFocusNode(nodeId)
           }}
         />
       )}

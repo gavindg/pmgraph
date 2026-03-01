@@ -8,14 +8,13 @@
  */
 import { useState, useEffect, useRef, useMemo } from "react"
 import { usePMGraphStore, getActivePreset } from "../store/usePMGraphStore"
-import { PRIORITY_COLORS, LABEL_COLORS, STATUS_COLORS } from "../utils/colors"
+import { PRIORITY_COLORS, LABEL_COLORS, getStatusBg } from "../utils/colors"
 import { DUMMY_USERS } from "../utils/users"
 import DropdownInput from "./DropdownInput"
+import DatePicker from "./DatePicker"
 import type { TaskNodeData, Priority, Status, LabelItem } from "../types"
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"]
-const STATUSES: Status[] = ["todo", "in-progress", "done"]
-const STATUS_LABELS: Record<Status, string> = { "todo": "Todo", "in-progress": "In Progress", "done": "Done" }
 
 interface NodeFocusPanelProps {
 	mode: "create" | "edit"
@@ -151,22 +150,22 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
             {/* Status */}
             <Field label="Status">
               <div className="flex rounded-lg overflow-hidden border border-[var(--color-border-default)]">
-                {STATUSES.map((s) => {
-                  const active = status === s
+                {preset.statuses.map((s) => {
+                  const active = status === s.id
                   return (
                     <button
-                      key={s}
+                      key={s.id}
                       type="button"
-                      onClick={() => setStatus(s)}
+                      onClick={() => setStatus(s.id)}
                       className={[
                         "flex-1 py-1.5 text-xs font-medium transition-colors duration-150",
                         active
                           ? "text-white"
                           : "bg-[var(--color-surface-overlay)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
                       ].join(" ")}
-                      style={active ? { backgroundColor: STATUS_COLORS[s].bg } : {}}
+                      style={active ? { backgroundColor: getStatusBg(preset.statuses, s.id) } : {}}
                     >
-                      {STATUS_LABELS[s]}
+                      {s.label}
                     </button>
                   )
                 })}
@@ -209,10 +208,9 @@ export default function NodeFocusPanel({ mode, nodeId, onSubmit, onClose }: Node
 								/>
 							</Field>
 							<Field label="Due Date">
-								<input
-									type="date"
+								<DatePicker
 									value={dueDate}
-									onChange={(e) => setDueDate(e.target.value)}
+									onChange={setDueDate}
 									className={inputClass}
 								/>
 							</Field>

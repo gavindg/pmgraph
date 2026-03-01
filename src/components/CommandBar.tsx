@@ -14,6 +14,7 @@ import type { TaskNodeData } from "../types"
 interface CommandBarProps {
   onClose: () => void
   onCreateTask: () => void
+  onNavigateToNode: (nodeId: string) => void
 }
 
 interface ResultItem {
@@ -24,10 +25,8 @@ interface ResultItem {
   color?: string
 }
 
-export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
+export default function CommandBar({ onClose, onCreateTask, onNavigateToNode }: CommandBarProps) {
   const nodes = usePMGraphStore((s) => s.nodes)
-  const setSelectedNode = usePMGraphStore((s) => s.setSelectedNode)
-  const setTaskPanelOpen = usePMGraphStore((s) => s.setTaskPanelOpen)
   const activeView = usePMGraphStore((s) => s.activeView)
   const setActiveView = usePMGraphStore((s) => s.setActiveView)
   const preset = usePMGraphStore((s) => getActivePreset(s))
@@ -46,7 +45,7 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
 
     // Commands
     if (!q || "create task".includes(q)) {
-      items.push({ type: "command", id: "create-task", label: "Create Task", subtitle: "Ctrl+A" })
+      items.push({ type: "command", id: "create-task", label: "Create Task", subtitle: "A" })
     }
     if (!q || "kanban view".includes(q) || "board".includes(q)) {
       items.push({ type: "command", id: "kanban-view", label: "Kanban View", subtitle: activeView === "kanban" ? "Current" : undefined })
@@ -66,7 +65,10 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
           const title = (d.title as string).toLowerCase()
           const assignee = (d.assignee as string).toLowerCase()
           const dept = (d.department as string).toLowerCase()
-          return title.includes(q) || assignee.includes(q) || dept.includes(q)
+          const labelMatch = (d.labels as { text: string }[] ?? []).some(
+            (l) => l.text.toLowerCase().includes(q)
+          )
+          return title.includes(q) || assignee.includes(q) || dept.includes(q) || labelMatch
         })
       : taskNodes
 
@@ -102,12 +104,11 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
           setActiveView(activeView === "graph" ? "kanban" : "graph")
         }
       } else if (item.type === "task") {
-        setSelectedNode(item.id)
-        setTaskPanelOpen(true)
+        onNavigateToNode(item.id)
       }
       onClose()
     },
-    [onClose, onCreateTask, setSelectedNode, setTaskPanelOpen, setActiveView, activeView]
+    [onClose, onCreateTask, onNavigateToNode, setActiveView, activeView]
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -131,7 +132,7 @@ export default function CommandBar({ onClose, onCreateTask }: CommandBarProps) {
       <div className="fixed inset-0 z-[998] bg-black/40" onClick={onClose} />
 
       {/* Bar */}
-      <div className="fixed top-[20%] left-1/2 -translate-x-1/2 z-[999] w-full max-w-md">
+      <div className="fixed top-[20%] left-1/2 -translate-x-1/2 z-[999] w-full max-w-xl">
         <div className="bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] rounded-xl shadow-2xl overflow-hidden">
           {/* Search input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border-subtle)]">
